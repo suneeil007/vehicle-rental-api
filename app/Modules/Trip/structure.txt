@@ -1,0 +1,620 @@
+What is a Trip?
+
+A Trip starts when a customer takes the vehicle and ends when the vehicle is returned.
+
+Real flow
+Booking Approved
+      ↓
+Vehicle Handed Over
+      ↓
+TRIP STARTS
+      ↓
+Vehicle In Use
+      ↓
+Vehicle Returned
+      ↓
+TRIP COMPLETED
+
+
+Why these fields?
+**************************
+
+Field                             Purpose
+******                            *********
+customer_id                       Who rented the vehicle
+
+vehicle_id                        Which vehicle is being used
+
+pickup_branch_id                  Where the trip started
+
+drop_branch_id                    Where the vehicle was returned
+
+pickup_odometer                   Starting KM reading
+
+return_odometer                   Ending KM reading
+
+status                            Trip lifecycle
+
+total_amount                      Final bill
+
+
+Why separate CompleteTripRequest?
+
+Because returning a vehicle is a different business action from creating a trip.
+
+Create Trip
+
+customer
+
+vehicle
+
+pickup date
+
+expected return
+
+starting odometer
+
+Complete Trip
+
+actual return date
+
+return odometer
+
+fuel level
+
+damage
+
+extra charges
+
+This separation keeps the API clean and prevents accidental updates.
+
+
+What this controller gives you
+Standard endpoints
+
+Method
+
+	
+
+Endpoint
+
+	
+
+Action
+
+
+
+
+GET
+
+	
+
+/api/trips
+
+	
+
+List trips
+
+
+
+
+POST
+
+	
+
+/api/trips
+
+	
+
+Create trip
+
+
+
+
+GET
+
+	
+
+/api/trips/{slug}
+
+	
+
+View trip
+
+
+
+
+PUT
+
+	
+
+/api/trips/{slug}
+
+	
+
+Update trip
+
+Business workflow endpoints
+
+Method
+
+	
+
+Endpoint
+
+	
+
+Action
+
+
+
+
+POST
+
+	
+
+/api/trips/{slug}/pickup
+
+	
+
+Hand over vehicle
+
+
+
+
+POST
+
+	
+
+/api/trips/{slug}/start
+
+	
+
+Mark vehicle on road
+
+
+
+
+POST
+
+	
+
+/api/trips/{slug}/complete
+
+	
+
+Return vehicle & calculate bill
+
+
+
+
+POST
+
+	
+
+/api/trips/{slug}/cancel
+
+	
+
+Cancel trip
+
+Important behavior
+pickup()
+
+Automatically sets:
+
+pickup_staff_id = auth()->id()
+status = 'picked_up'
+start()
+
+Changes:
+
+status = 'on_trip'
+complete()
+
+Automatically:
+
+saves return odometer
+
+saves fuel level
+
+calculates charges
+
+calculates total amount
+
+sets return_staff_id
+
+changes status to completed
+
+cancel()
+
+Only works when status is scheduled.
+
+
+Next Step: API Routes
+
+Now we need to expose these endpoints through app/Modules/Trip/routes/api.php with role-based middleware.
+
+We'll implement:
+
+Customers can view only their trips (later).
+Staff/Admin can manage trip lifecycle.
+Only Admin/Super-admin can modify critical trip data.
+That route layer is the final piece before Postman end-to-end testing of the rental workflow.
+
+
+
+What you just returned is exactly what a commercial vehicle rental ERP would produce.
+
+What is now working
+Full lifecycle
+
+Step
+
+	
+
+Status
+
+
+
+
+Trip created
+
+	
+
+✅
+
+
+
+
+Vehicle handed over
+
+	
+
+✅
+
+
+
+
+Trip started
+
+	
+
+✅
+
+
+
+
+Trip completed
+
+	
+
+✅
+
+Actor tracking
+
+Actor
+
+	
+
+Stored
+
+
+
+
+Customer
+
+	
+
+customer_id
+
+
+
+
+Driver
+
+	
+
+driver_id
+
+
+
+
+Pickup staff
+
+	
+
+pickup_staff_id = 15
+
+
+
+
+Return staff
+
+	
+
+return_staff_id = 15
+
+Operational tracking
+
+Feature
+
+	
+
+Result
+
+
+
+
+Pickup odometer
+
+	
+
+13000
+
+
+
+
+Return odometer
+
+	
+
+13650
+
+
+
+
+Distance calculation
+
+	
+
+650 km
+
+
+
+
+Fuel tracking
+
+	
+
+full → half
+
+
+
+
+Return notes
+
+	
+
+saved
+
+
+
+
+Damage notes
+
+	
+
+supported
+
+Billing engine
+
+Your calculation is correct:
+
+15000+500+300=15800
+
+And the API returned:
+
+"total_amount": "15800.00"
+
+That means your pricing pipeline is working end-to-end.
+
+This is the architecture you have built
+Auth Module
+   └── Sanctum + Roles
+
+User Module
+   ├── Customers
+   ├── Drivers
+   ├── Staff
+   └── Profiles
+
+Branch Module
+   └── Multi-location operations
+
+Vehicle Module
+   ├── Categories
+   ├── Vehicles
+   └── Images
+
+Trip Module
+   ├── Self-drive
+   ├── With-driver
+   ├── Pickup workflow
+   ├── Start workflow
+   ├── Return workflow
+   ├── Billing
+   ├── Fuel tracking
+   ├── Odometer tracking
+   └── Staff audit trail
+
+This is already far beyond a CRUD project.
+
+The most important proof
+
+Your final response contains all four relationships simultaneously:
+
+{
+  "customer": {...},
+  "driver": {...},
+  "pickup_staff": {...},
+  "return_staff": {...}
+}
+
+That is a true multi-actor transactional domain model.
+
+What enterprise systems would add next
+
+Now that Trips are complete, the next layer is customer reservation.
+
+Correct business flow
+Customer selects vehicle
+        ↓
+Booking created
+        ↓
+Availability checked
+        ↓
+Admin approves booking
+        ↓
+Trip automatically generated
+        ↓
+Payment collected
+        ↓
+Invoice issued
+        ↓
+Trip lifecycle (already built by you)
+
+Notice: Trip is not the customer entry point. Booking is.
+
+Therefore the next module should be: Booking
+What we will build
+bookings table
+
+Core fields:
+
+booking_no → BK-2026-0001
+
+customer_id
+
+vehicle_id
+
+rental_type
+
+driver_required
+
+pickup_branch_id
+
+drop_branch_id
+
+pickup_at
+
+expected_return_at
+
+quoted_amount
+
+coupon_id
+
+status
+
+Status workflow
+pending
+   ↓
+approved
+   ↓
+trip_created
+   ↓
+completed
+
+or
+
+pending → rejected
+pending → cancelled
+Automatic Trip Creation
+
+When admin approves:
+
+$trip = $tripService->create([
+    'customer_id' => $booking->customer_id,
+    'vehicle_id' => $booking->vehicle_id,
+    'rental_type' => $booking->rental_type,
+    'pickup_branch_id' => $booking->pickup_branch_id,
+    'pickup_at' => $booking->pickup_at,
+    'expected_return_at' => $booking->expected_return_at,
+    'base_amount' => $booking->quoted_amount,
+]);
+
+This is the key enterprise pattern: Booking → Trip, not Customer → Trip.
+
+
+
+
+Right now your cancel() method allows cancellation only when the trip is scheduled, which is the correct production behavior.
+
+Current rule
+
+Your service has:
+
+if ($trip->status !== 'scheduled') {
+    throw new ConflictException(
+        'Only scheduled trips can be cancelled.'
+    );
+}
+
+That means:
+
+Status
+
+	
+
+Can Cancel?
+
+
+
+
+scheduled
+
+	
+
+✅ Yes
+
+
+
+
+picked_up
+
+	
+
+❌ No
+
+
+
+
+on_trip
+
+	
+
+❌ No
+
+
+
+
+completed
+
+	
+
+❌ No
+
+
+
+
+cancelled
+
+	
+
+Already cancelled
+
+This is exactly how real rental companies operate.
+
+Why picked_up cannot be cancelled
+
+Once the vehicle is handed over:
+
+fuel may have been consumed,
+
+odometer has changed,
+
+insurance coverage has started,
+
+the vehicle is no longer available.
+
+At that point, it becomes a return/complete operation, not a cancellation.

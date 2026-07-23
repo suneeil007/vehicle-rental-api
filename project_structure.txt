@@ -1,0 +1,16 @@
+                'Auth',
+                'Vehicle',
+                'Booking',
+                'Location',
+                'Trip',
+                'Branch',
+                'Payment',
+                'Coupon',
+                'Review',
+                'Notification',
+                'User',
+                'Role', 
+
+
+php artisan module:make Vehicle  => this command to generate the module folders and files with 
+php artisan module:make-migration Vehicle create_vehicle_categories_table => this for migrations                

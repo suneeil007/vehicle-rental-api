@@ -1,0 +1,99 @@
+Your rental flow should become:
+
+Customer
+   |
+   | creates booking
+   ↓
+Booking (pending)
+   |
+   | Admin approves
+   ↓
+Booking (approved)
+   |
+   | System creates Trip
+   ↓
+Booking (trip_created)
+   |
+   | Trip lifecycle
+   ↓
+picked_up → on_trip → completed
+
+
+Your Booking module flow is now:
+
+Customer
+   |
+   | POST /api/bookings
+   ↓
+Booking status = pending
+
+Staff/Admin
+   |
+   | approve
+   ↓
+Booking status = approved
+
+Staff/Admin
+   |
+   | create-trip
+   ↓
+Trip created
+Booking status = trip_created
+
+Trip workflow
+   |
+   | pickup → start → complete
+
+
+
+   Your workflow now should continue like this:
+
+CUSTOMER
+   |
+   | POST /api/bookings
+   |
+   ↓
+Booking
+status = pending
+
+
+STAFF / ADMIN
+   |
+   | POST /api/bookings/{booking}/approve
+   |
+   ↓
+Booking
+status = approved
+approved_by = user id
+approved_at = datetime
+
+
+STAFF / ADMIN
+   |
+   | POST /api/bookings/{booking}/create-trip
+   |
+   ↓
+Trip created
+Booking
+status = trip_created
+trip_id = xxx
+
+
+STAFF
+   |
+   | POST /api/trips/{trip}/pickup
+   |
+   ↓
+Trip
+status = picked_up
+
+
+STAFF
+   |
+   | POST /api/trips/{trip}/complete
+   |
+   ↓
+Trip
+status = completed
+Booking
+status = completed

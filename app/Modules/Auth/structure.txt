@@ -1,0 +1,342 @@
+*********************************
+modular architecture
+*********************************
+
+Your API flow is now:
+
+Client (Postman / React / Mobile)
+              |
+              |
+        POST /api/auth/login
+              |
+              |
+       Sanctum Token Generated
+              |
+              |
+ Authorization: Bearer TOKEN
+              |
+              |
+       /api/vehicles
+              |
+              |
+       auth:sanctum middleware
+              |
+              |
+       VehicleController
+
+       
+
+app/
+└── Modules/
+    └── Auth/
+        ├── Controllers/
+        │   └── AuthController.php
+        │
+        ├── Requests/
+        │   ├── LoginRequest.php
+        │   ├── RegisterRequest.php
+        │   ├── ForgotPasswordRequest.php
+        │   ├── ResetPasswordRequest.php
+        │   ├── ChangePasswordRequest.php
+        │   └── UpdateProfileRequest.php
+        │
+        ├── Resources/
+        │   └── UserResource.php
+        │
+        ├── Services/
+        │   └── AuthService.php
+        │
+        ├── Repositories/
+        │   ├── AuthRepository.php
+        │   └── Contracts/
+        │       └── AuthRepositoryInterface.php
+        │
+        ├── Providers/
+        │   └── AuthServiceProvider.php
+        │
+        ├── Database/
+        │   ├── Migrations/
+        │   └── Seeders/
+        │
+        ├── routes/
+        │   └── api.php
+        │
+        ├── config/
+        └── Helpers/
+
+
+Recommended User Roles
+
+I'd use a single users table with a role column (or later a roles table if permissions become more complex).
+
+Super Admin
+Admin
+Branch Manager
+Staff
+Driver
+Customer        
+
+
+API Routes
+POST    /register
+POST    /login
+POST    /logout
+
+GET     /profile
+PUT     /profile
+
+PUT     /change-password
+
+POST    /forgot-password
+POST    /reset-password
+
+Protected routes:
+
+Route::middleware('auth:sanctum')->group(function () {
+
+    Route::get('/profile', ...);
+
+    Route::put('/profile', ...);
+
+    Route::post('/logout', ...);
+
+});
+Registration Flow
+Client
+
+↓
+
+RegisterRequest
+
+↓
+
+AuthController
+
+↓
+
+AuthService
+
+↓
+
+AuthRepository
+
+↓
+
+User Model
+
+↓
+
+Database
+Login Flow
+Email + Password
+
+↓
+
+LoginRequest
+
+↓
+
+AuthController
+
+↓
+
+AuthService
+
+↓
+
+AuthRepository
+
+↓
+
+Hash::check()
+
+↓
+
+Sanctum Token
+
+↓
+
+Return User + Token
+Role Authorization
+
+Laravel middleware makes this straightforward.
+
+auth:sanctum
+
+Then create a custom middleware:
+
+role:admin
+
+role:customer
+
+role:driver
+
+role:staff
+
+role:branch_manager
+
+Example:
+
+Route::middleware([
+    'auth:sanctum',
+    'role:admin'
+])->group(function () {
+
+    Route::apiResource('vehicles', VehicleController::class);
+
+});
+Authentication Response
+
+Example login response:
+
+{
+    "success": true,
+    "message": "Login successful.",
+    "token": "1|MZoHqz....",
+    "user": {
+        "id": 1,
+        "name": "Super Admin",
+        "email": "admin@test.com",
+        "role": "super_admin"
+    }
+}
+
+
+Development Order
+
+I recommend building the Auth module in this sequence:
+
+Install and configure Sanctum.
+Update the users table (add role and status).
+Create the Auth module structure.
+Build the repository.
+Build the service.
+Implement Register.
+Implement Login.
+Implement Logout.
+Implement Profile.
+Implement Update Profile.
+Implement Change Password.
+Add role middleware.
+Protect the Vehicle, Branch, Booking, and other modules with auth:sanctum.
+
+This gives you a solid authentication foundation before you move on to the remaining business modules like Branch, Booking, Payment, and Review.
+
+
+For your project (Vehicle Rental API with Laravel 13 + Sanctum + Modular Architecture), I recommend the following best practice.
+
+Your current approach:
+
+app/
+└── Modules/
+    ├── Vehicle/
+    ├── Auth/
+    ├── Branch/
+    ├── Booking/
+    └── ...
+
+is good. Keep it.
+
+But for database migrations, I would slightly adjust the approach.
+
+Recommended Migration Strategy
+1. Keep Laravel core tables in default migrations
+
+Do not move these into modules:
+
+database/
+└── migrations/
+
+    create_users_table.php
+    create_cache_table.php
+    create_jobs_table.php
+    create_personal_access_tokens_table.php
+
+Reason:
+
+These are framework-level tables, not business modules.
+
+Example:
+
+users
+personal_access_tokens
+password_reset_tokens
+
+belong to Laravel/Sanctum.
+
+2. Module-specific tables stay inside modules
+
+Example:
+
+app/
+└── Modules/
+
+    ├── Vehicle/
+    │   └── Database/
+    │       └── Migrations/
+    │           ├── create_vehicle_categories_table.php
+    │           ├── create_vehicles_table.php
+    │           └── create_vehicle_images_table.php
+
+
+    ├── Branch/
+    │   └── Database/
+    │       └── Migrations/
+    │           └── create_branches_table.php
+
+
+    ├── Booking/
+    │   └── Database/
+    │       └── Migrations/
+    │           └── create_bookings_table.php
+
+
+    └── Auth/
+        └── Database/
+            └── Migrations/
+                └── create_roles_table.php
+
+This is what you already started with Vehicle. Continue the same pattern.
+
+Auth Module Recommendation
+
+For authentication, I would design like this:
+
+users table (Laravel default)
+
+Modify the existing migration:
+
+users
+
+id
+name
+email
+phone
+password
+
+role_id
+branch_id
+
+status
+
+email_verified_at
+remember_token
+
+created_at
+updated_at
+roles table (Auth module)
+
+Migration:
+
+Auth/Database/Migrations/create_roles_table.php
+
+Structure:
+
+roles
+
+id
+name
+slug
+
+created_at
+updated_at

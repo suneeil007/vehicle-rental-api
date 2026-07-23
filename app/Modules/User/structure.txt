@@ -1,0 +1,193 @@
+Phase 1 – Create User Module
+php artisan module:make User
+
+User
+│
+├── Controllers
+│   ├── UserController.php
+│   └── UserProfileController.php
+│
+├── Models
+│   └── UserProfile.php
+│
+├── Repositories
+│   ├── Contracts
+│   │   ├── UserRepositoryInterface.php
+│   │   └── UserProfileRepositoryInterface.php
+│   │
+│   ├── UserRepository.php
+│   └── UserProfileRepository.php
+│
+├── Services
+│   ├── UserService.php
+│   └── UserProfileService.php
+│
+├── Requests
+├── Resources
+├── routes
+├── Providers
+└── Database
+
+
+Yes. Since you're building a production-quality Vehicle Rental API, I would not put User management inside the Auth module.
+
+The separation should be:
+
+Auth Module → Register, Login, Logout, Refresh Token, Change Password, Forgot Password
+User Module → User CRUD, Profile, Roles, Branch Assignment, Status, User Listing
+
+
+User Module (User Management)
+
+Responsible for managing users.
+
+GET      /api/users
+GET      /api/users/{user}
+POST     /api/users
+PUT      /api/users/{user}
+PATCH    /api/users/{user}
+DELETE   /api/users/{user}
+
+PATCH    /api/users/{user}/status
+PATCH    /api/users/{user}/role
+PATCH    /api/users/{user}/branch
+
+app/
+├── Exceptions/
+│   ├── ApiException.php
+│   ├── ConflictException.php
+│   ├── ForbiddenException.php
+│   ├── NotFoundException.php
+│   ├── UnauthorizedException.php
+│   └── ValidationException.php
+│
+└── Helpers/
+    └── ApiResponse.php
+
+
+Your structure should become:
+
+app/
+└── Modules/
+    └── User/
+        ├── Controllers/
+        ├── Database/
+        ├── Models/
+        ├── Providers/
+        ├── Repositories/
+        │   └── Contracts/
+        ├── Requests/
+        ├── Resources/
+        ├── Services/
+        └── routes/
+Phase 2 – Create Classes
+Controller
+php artisan make:controller User/UserController
+
+Move it to
+
+Modules/User/Controllers
+Repository
+Repositories/
+    UserRepository.php
+
+Repositories/Contracts/
+    UserRepositoryInterface.php
+Service
+Services/
+    UserService.php
+Resource
+Resources/
+    UserResource.php
+Routes
+routes/api.php
+Final Folder Structure
+User
+│
+├── Controllers
+│   └── UserController.php
+│
+├── Services
+│   └── UserService.php
+│
+├── Repositories
+│   ├── UserRepository.php
+│   │
+│   └── Contracts
+│       └── UserRepositoryInterface.php
+│
+├── Resources
+│   └── UserResource.php
+│
+├── Requests
+│
+├── Providers
+│   └── UserServiceProvider.php
+│
+└── routes
+    └── api.php
+Phase 3 – Responsibilities
+Controller
+
+Only receives HTTP requests.
+
+Request
+   ↓
+Controller
+   ↓
+Service
+   ↓
+Repository
+   ↓
+Database
+Service
+
+Business rules.
+
+Example:
+
+assign role
+assign branch
+deactivate user
+reset password
+change status
+Repository
+
+Database only.
+
+Example:
+
+User::with(...)
+
+No business logic.
+
+Resource
+
+JSON formatting only.
+
+APIs we'll build
+Listing
+GET /api/users
+Single User
+GET /api/users/{id}
+Create User
+POST /api/users
+Update User
+PUT /api/users/{id}
+Delete User
+DELETE /api/users/{id}
+Change Status
+PATCH /api/users/{id}/status
+Assign Role
+PATCH /api/users/{id}/role
+Assign Branch
+PATCH /api/users/{id}/branch
+Authorization (later)
+
+We'll secure these endpoints with role-based permissions, for example:
+
+Role	Permission
+Super Admin	Everything
+Branch Admin	Only own branch
+Staff	Read only
+Customer	Own profile only

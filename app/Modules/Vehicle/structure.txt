@@ -1,0 +1,309 @@
+Custom modular Artisan command
+****************************************
+
+php artisan module:make Vehicle  => this command to generate the module folders and files with 
+php artisan module:make-migration Vehicle create_vehicle_categories_table => this for migrations
+
+
+
+app/Modules/Vehicle/
+├── Controllers/     → Handles HTTP (request in, response out)
+├── Requests/        → Validates incoming data
+├── Services/        → Business logic / orchestration
+├── Repositories/    → Data access (talks to the database)
+├── Models/          → Represents DB tables (Eloquent)
+├── Resources/       → Shapes the JSON output
+├── Providers/       → Wires everything together (the "glue")
+├── Database/        → Migrations (schema)
+├── routes/          → URL → Controller method mapping
+└── config/, Helpers/ → Module-specific config/utilities
+
+
+Dedicated User module rather than adding user listing to the Auth module.
+
+
+app/
+├── Core/
+│   ├── Exceptions/
+│   │   ├── ApiException.php
+│   │   ├── ConflictException.php
+│   │   ├── NotFoundException.php
+│   │   ├── ValidationException.php
+│   │   ├── UnauthorizedException.php
+│   │   └── ForbiddenException.php
+│   │
+│   ├── Helpers/
+│   │   └── ApiResponse.php
+│   │
+│   └── Traits/
+
+
+*********************************
+modular architecture
+*********************************
+
+app/
+└── Modules/
+    └── Vehicle/
+        ├── Controllers/
+        │   └── VehicleController.php
+        ├── Models/
+        │   └── Vehicle.php
+        ├── Requests/
+        │   ├── StoreVehicleRequest.php
+        │   └── UpdateVehicleRequest.php
+        ├── Resources/
+        │   └── VehicleResource.php
+        ├── Services/
+        │   └── VehicleService.php
+        ├── Repositories/
+        │   ├── VehicleRepository.php
+        │   └── Contracts/
+        │       └── VehicleRepositoryInterface.php
+        ├── Providers/
+        │   └── VehicleServiceProvider.php
+        ├── Database/
+        │   └── Migrations/
+        ├── routes/
+        │   └── api.php
+        ├── config/
+        └── Helpers/
+
+
+************
+Enums
+************
+app/
+└── Modules/
+    └── Vehicle/
+        └── Enums/
+            ├── FuelType.php
+            ├── TransmissionType.php
+
+
+
+************
+Models
+************
+
+app/
+└── Modules/
+    └── Vehicle/
+        ├── Models/
+        │   ├── Vehicle.php
+        │   ├── VehicleCategory.php
+        │   └── VehicleImage.php
+
+
+
+*************************************
+Repository Layer (Data Access Layer).
+*************************************
+
+
+Vehicle
+│
+├── Repositories
+│   ├── Contracts
+│   │   └── VehicleRepositoryInterface.php
+│   │
+│   └── VehicleRepository.php
+
+
+***********************
+Project Flow
+***********************
+
+Request
+    │
+    ▼
+Controller
+    │
+    ▼
+VehicleService   ← Business Logic
+    │
+    ▼
+VehicleRepository ← Database Access
+    │
+    ▼
+MySQL
+
+
+
+
+***********************
+Current architecture:
+***********************
+
+API Request
+      │
+      ▼
+VehicleController
+      │
+      ▼
+VehicleService
+      │
+      ▼
+VehicleRepository
+      │
+      ▼
+Database
+
+
+
+**********************
+VehicleRepository
+***********************
+
+getAll()
+getById()
+create()
+update()
+delete()
+existsBySlug()
+existsByRegistration()
+findBySlug()
+search()
+getCategories()
+
+
+*********************
+Vehicle Module
+*********************
+
+
+✅ Migration
+✅ Model
+✅ Repository
+✅ Service
+
+⬜ StoreVehicleRequest
+⬜ UpdateVehicleRequest
+
+⬜ VehicleResource
+
+⬜ VehicleController
+
+⬜ API Routes
+
+⬜ Testing
+
+
+*************************************
+What is a Resource?
+A Resource is a Response Transformer.
+It converts
+**************************************
+Vehicle Model
+        ↓
+VehicleResource
+        ↓
+JSON Response
+
+
+
+***********************
+Current architecture:
+***********************
+HTTP Request
+      │
+      ▼
+VehicleController
+      │
+      ▼
+VehicleService
+      │
+      ▼
+VehicleRepositoryInterface
+      │
+      ▼
+VehicleRepository
+      │
+      ▼
+Eloquent Model
+      │
+      ▼
+MySQL
+
+
+
+*******************************************
+Vehicle Module Structure
+Your module can contain multiple resources:
+********************************************
+
+Vehicle
+│
+├── Controllers
+│   ├── VehicleController.php
+│   ├── VehicleCategoryController.php
+│   └── VehicleImageController.php
+│
+├── Models
+│   ├── Vehicle.php
+│   ├── VehicleCategory.php
+│   └── VehicleImage.php
+│
+├── Requests
+│   ├── StoreVehicleRequest.php
+│   ├── UpdateVehicleRequest.php
+│   ├── StoreVehicleCategoryRequest.php
+│   ├── UpdateVehicleCategoryRequest.php
+│   ├── StoreVehicleImageRequest.php
+│   └── UpdateVehicleImageRequest.php
+│
+├── Resources
+│   ├── VehicleResource.php
+│   ├── VehicleCategoryResource.php
+│   └── VehicleImageResource.php
+│
+├── Services
+│   ├── VehicleService.php
+│   ├── VehicleCategoryService.php
+│   └── VehicleImageService.php
+│
+├── Repositories
+│   ├── VehicleRepository.php
+│   ├── VehicleCategoryRepository.php
+│   ├── VehicleImageRepository.php
+│   └── Contracts
+│       ├── VehicleRepositoryInterface.php
+│       ├── VehicleCategoryRepositoryInterface.php
+│       └── VehicleImageRepositoryInterface.php
+
+************************************
+That's why your routes are correct
+************************************
+
+GET     /vehicle-categories        -> index
+POST    /vehicle-categories        -> store   ✅ Create data
+GET     /vehicle-categories/{id}   -> show
+PUT     /vehicle-categories/{id}   -> update
+DELETE  /vehicle-categories/{id}   -> destroy
+
+
+You only need the service when there is business logic or additional processing.
+
+
+
+For a production-ready vehicle rental API, I'd recommend this order:
+
+Priority	Module	Status
+1	✅ Vehicle Category	Complete
+2	✅ Vehicle	Complete
+3	🔄 Auth	Next
+4	Branch	Pending
+5	Booking	Pending
+6	Payment	Pending
+7	Coupon	Pending
+8	Review	Pending
+9	Notification	Pending
+
+What should the Auth module include?
+Phase 1 (Essential)
+POST   /login
+POST   /logout
+GET    /me
+PUT    /profile
+PUT    /change-password
+POST   /refresh-token (if using JWT)
