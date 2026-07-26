@@ -28,6 +28,10 @@ public function rules(): array
         ],
         'phone' => ['sometimes', 'string', 'max:20'],
 
+        // Role & status
+        'role_id' => ['sometimes', 'integer', Rule::exists('roles', 'id')],
+        'status' => ['sometimes', 'string', Rule::in(['active', 'inactive', 'suspended'])],
+
         // UserProfile table fields
         'date_of_birth' => ['sometimes', 'date'],
         'gender' => ['sometimes', 'string'],
