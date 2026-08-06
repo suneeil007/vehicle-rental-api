@@ -46,64 +46,33 @@ class UserService
     /**
      * Create user.
      */
-    public function create(array $data): User
+   public function create(array $data): User
     {
         return DB::transaction(function () use ($data) {
 
-            if (
-                $this->repository->existsByEmail($data['email'])
-            ) {
-                throw new ConflictException(
-                    'Email already exists.'
-                );
+            if ($this->repository->existsByEmail($data['email'])) {
+                throw new ConflictException('Email already exists.');
             }
 
-            if (
-                !empty($data['phone']) &&
-                $this->repository->existsByPhone($data['phone'])
-            ) {
-                throw new ConflictException(
-                    'Phone already exists.'
-                );
+            if (!empty($data['phone']) && $this->repository->existsByPhone($data['phone'])) {
+                throw new ConflictException('Phone already exists.');
             }
-
-            /*
-            |--------------------------------------------------------------------------
-            | Generate UUID
-            |--------------------------------------------------------------------------
-            */
 
             $slug = (string) Str::uuid();
-
             $data['slug'] = $slug;
 
-            /*
-            |--------------------------------------------------------------------------
-            | Create User
-            |--------------------------------------------------------------------------
-            */
+            $profileData = $data['profile'] ?? [];
+            unset($data['profile']);
 
+            // No manual hashing needed — the User model's 'password' => 'hashed' cast does this automatically
             $user = $this->repository->create($data);
 
-            /*
-            |--------------------------------------------------------------------------
-            | Create User Profile
-            |--------------------------------------------------------------------------
-            */
-
-            $this->profileRepository->create([
-
+            $this->profileRepository->create(array_merge($profileData, [
                 'user_id' => $user->id,
-
                 'slug' => $slug,
+            ]));
 
-            ]);
-
-            return $user->load([
-                'role',
-                'branch',
-                'profile',
-            ]);
+            return $user->load(['role', 'branch', 'profile']);
 
         });
     }

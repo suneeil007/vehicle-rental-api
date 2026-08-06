@@ -26,6 +26,15 @@ class StoreVehicleCategoryRequest extends FormRequest
                 'string',
             ],
 
+            'image' => [
+                'nullable',
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:2048', // 2 MB
+            ],
+
+            
+
             'status' => [
                 'required',
                 'boolean',
@@ -41,6 +50,10 @@ class StoreVehicleCategoryRequest extends FormRequest
             'name.required' => 'Category name is required.',
             'status.required' => 'Status is required.',
             'status.boolean' => 'Status must be true or false.',
+
+            'image.image' => 'Please upload a valid image.',
+            'image.mimes' => 'Only JPG, JPEG, PNG, and WEBP images are allowed.',
+            'image.max' => 'The image size must not exceed 2 MB.',
 
         ];
     }

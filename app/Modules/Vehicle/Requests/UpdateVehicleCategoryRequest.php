@@ -27,6 +27,13 @@ class UpdateVehicleCategoryRequest extends FormRequest
                 'string',
             ],
 
+            'image' => [
+                'nullable',
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:2048',
+            ],
+
             'status' => [
                 'sometimes',
                 'boolean',
@@ -40,6 +47,10 @@ class UpdateVehicleCategoryRequest extends FormRequest
         return [
             'name.required' => 'Category name is required.',
             'status.boolean' => 'Status must be true or false.',
+            'image.image' => 'Please upload a valid image.',
+            'image.mimes' => 'Only JPG, JPEG, PNG, and WEBP images are allowed.',
+            'image.max' => 'The image size must not exceed 2 MB.',
+
         ];
     }
 }

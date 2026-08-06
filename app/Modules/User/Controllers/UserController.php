@@ -81,21 +81,21 @@ class UserController extends Controller
      */
     
     public function update(
-    UpdateUserProfileRequest $request,
-        string $user
-    ): JsonResponse {
+        UpdateUserProfileRequest $request,
+            string $user
+        ): JsonResponse {
 
-        $profile = $this->UserProfileService->findBySlug($user);
+            $profile = $this->UserProfileService->findBySlug($user);
 
-        $profile = $this->UserProfileService->update(
-            $profile,
-            $request->validated()
-        );
+            $profile = $this->UserProfileService->update(
+                $profile,
+                $request->validated()
+            );
 
-        return ApiResponse::updated(
-            new UserProfileResource($profile),
-            'User profile updated successfully.'
-        );
+            return ApiResponse::updated(
+                new UserProfileResource($profile),
+                'User profile updated successfully.'
+            );
     }
 
     /**
@@ -117,6 +117,69 @@ public function profile(
             'User profile retrieved successfully.'
         );
     }
+
+
+    public function myProfile(): JsonResponse
+    {
+
+        $user = auth()->user();
+
+
+        return ApiResponse::success(
+
+            new UserResource(
+
+                $user->load([
+                    'role',
+                    'branch',
+                    'profile'
+                ])
+
+            ),
+
+            'Profile retrieved successfully.'
+
+        );
+
+    }
+
+
+    public function destroy(User $user): JsonResponse
+        {
+            $authUser = auth()->user();
+            $resource = new UserResource($user);
+
+            // Only Super Admin can delete users
+            if ($authUser->role?->slug !== 'super-admin') {
+                return ApiResponse::error(
+                    'Only Super Admin can delete users.',
+                    403
+                );
+            }
+
+            // Super Admin cannot delete himself
+            if ($authUser->id === $user->id) {
+                return ApiResponse::error(
+                    'You cannot delete your own account.',
+                    403
+                );
+            }
+
+            // Prevent deleting another Super Admin
+            if ($user->role?->slug === 'super-admin') {
+                return ApiResponse::error(
+                    'Super Admin cannot be deleted.',
+                    403
+                );
+            }
+
+            $user->delete();
+
+            return ApiResponse::success(
+                $resource,
+                'User deleted successfully.'
+            );
+        }
 
 
     

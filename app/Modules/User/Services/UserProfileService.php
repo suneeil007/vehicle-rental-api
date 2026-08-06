@@ -46,51 +46,48 @@ class UserProfileService
         return $profile;
     }
 
-    /**
-     * Update profile.
-     */
-    public function update__(
-        UserProfile $profile,
-        array $data
-    ): UserProfile {
-
-        return DB::transaction(function () use ($profile, $data) {
-
-            return $this->repository->update(
-                $profile,
-                $data
-            );
-
-        });
-    }
+   
 
     /**
  * Update profile.
  */
-   public function update(
-            UserProfile $profile,
-            array $data
-        ): UserProfile {
+   
+    public function update(
+                UserProfile $profile,
+                array $data
+            ): UserProfile {
 
-            return DB::transaction(function () use ($profile, $data) {
+                // \Log::info('=== REAL METHOD RUNNING ===', ['data' => $data]);
+                return DB::transaction(function () use ($profile, $data) {
+                    $actingUser = auth()->user();
+                    // Restrict role_id and 'suspended' status to Super Admins only
+                    if (!$actingUser?->isSuperAdmin()) {
+                        unset($data['role_id']);
+                        if (($data['status'] ?? null) === 'suspended') {
+                            unset($data['status']);
+                        }
+                    }
 
-             
-                $userData = array_intersect_key(
-                    $data,
-                    array_flip(['name', 'email', 'phone', 'role_id', 'status']) 
-                );
+                    // Unwrap nested "profile" object sent from the frontend
+                    $profileInput = $data['profile'] ?? [];
+                    unset($data['profile']);
 
-                $profileData = array_diff_key($data, $userData);
+                    $userData = array_intersect_key(
+                        $data,
+                        array_flip(['name', 'email', 'phone', 'role_id', 'branch_id', 'status'])
+                    );
 
-                if (!empty($userData)) {
-                    $profile->user()->update($userData);
-                }
+                    if (!empty($userData)) {
+                        $profile->user()->update($userData);
+                    }
 
-                return $this->repository->update(
-                    $profile,
-                    $profileData
-                )->load('user.role');
+                    return $this->repository->update(
+                        $profile,
+                        $profileInput
+                    )->load('user.role');
 
-            });
-        }
+             });
+
+        }    
+
 }
