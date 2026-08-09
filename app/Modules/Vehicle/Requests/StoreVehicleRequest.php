@@ -104,6 +104,20 @@ class StoreVehicleRequest extends FormRequest
                 'required',
                 'in:available,booked,maintenance,inactive'
             ],
+
+            'images' => [
+                'nullable',
+                'array',
+                'max:8',
+            ],
+
+            'images.*' => [
+                'file',
+                'image',
+                'mimes:jpeg,png,jpg,webp',
+                'max:5120',
+            ],
+
         ];
     }
 }

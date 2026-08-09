@@ -4,6 +4,7 @@ namespace App\Modules\Vehicle\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use App\Modules\Vehicle\Resources\VehicleImageResource;
 
 class VehicleResource extends JsonResource
 {
@@ -34,14 +35,7 @@ class VehicleResource extends JsonResource
             'color' => $this->color,
             'description' => $this->description,
             'status' => $this->status,
-            'images' => $this->images->map(function ($image) {
-                return [
-                    'id' => $image->id,
-                    'image' => asset('storage/'.$image->image),
-                    'is_featured' => $image->is_featured,
-                    'sort_order' => $image->sort_order,
-                ];
-            }),
+            'images' => VehicleImageResource::collection($this->images),
             'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
             'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
         ];

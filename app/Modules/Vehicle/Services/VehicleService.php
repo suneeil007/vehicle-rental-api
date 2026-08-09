@@ -14,7 +14,8 @@ use Illuminate\Support\Str;
 class VehicleService
 {
     public function __construct(
-        protected VehicleRepositoryInterface $repository
+        protected VehicleRepositoryInterface $repository,
+        protected VehicleImageService $imageService
     ) {}
 
     /**
@@ -66,9 +67,9 @@ class VehicleService
     /**
      * Create vehicle.
      */
-    public function create(array $data): Vehicle
+    public function create(array $data, array $images = []): Vehicle
     {
-        return DB::transaction(function () use ($data) {
+        return DB::transaction(function () use ($data, $images) {
 
             if (
                 $this->repository->existsByRegistration(
@@ -82,7 +83,11 @@ class VehicleService
 
             $data['slug'] = $this->generateUniqueSlug();
 
-            return $this->repository->create($data);
+            $vehicle = $this->repository->create($data);
+
+            $this->imageService->storeMany($vehicle, $images);
+
+            return $vehicle->fresh(['category', 'images']);
 
         });
     }
@@ -92,10 +97,12 @@ class VehicleService
      */
     public function update(
         Vehicle $vehicle,
-        array $data
+        array $data,
+        array $images = [],
+        array $removedImageIds = []
     ): Vehicle {
 
-        return DB::transaction(function () use ($vehicle, $data) {
+        return DB::transaction(function () use ($vehicle, $data, $images, $removedImageIds) {
 
             if (
                 isset($data['registration_number']) &&
@@ -109,10 +116,15 @@ class VehicleService
                 );
             }
 
-            return $this->repository->update(
+            $vehicle = $this->repository->update(
                 $vehicle,
                 $data
             );
+
+            $this->imageService->deleteMany($vehicle, $removedImageIds);
+            $this->imageService->storeMany($vehicle, $images);
+
+            return $vehicle->fresh(['category', 'images']);
 
         });
     }
@@ -123,6 +135,8 @@ class VehicleService
     public function delete(Vehicle $vehicle): bool
     {
         return DB::transaction(function () use ($vehicle) {
+
+            $this->imageService->deleteAllForVehicle($vehicle);
 
             return $this->repository->delete($vehicle);
 

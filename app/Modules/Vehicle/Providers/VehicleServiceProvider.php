@@ -10,6 +10,9 @@ use App\Modules\Vehicle\Repositories\VehicleRepository;
 use App\Modules\Vehicle\Repositories\Contracts\VehicleCategoryRepositoryInterface;
 use App\Modules\Vehicle\Repositories\VehicleCategoryRepository;
 
+use App\Modules\Vehicle\Repositories\Contracts\VehicleImageRepositoryInterface;
+use App\Modules\Vehicle\Repositories\VehicleImageRepository;
+
 class VehicleServiceProvider extends ServiceProvider
 {
     /**
@@ -27,6 +30,12 @@ class VehicleServiceProvider extends ServiceProvider
         $this->app->bind(
             VehicleCategoryRepositoryInterface::class,
             VehicleCategoryRepository::class
+        );
+
+        // Vehicle Image Repository
+        $this->app->bind(
+            VehicleImageRepositoryInterface::class,
+            VehicleImageRepository::class
         );
     }
 
