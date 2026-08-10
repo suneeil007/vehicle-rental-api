@@ -16,21 +16,29 @@ class VehicleImageService
         protected VehicleImageRepositoryInterface $repository
     ) {}
 
-    public function storeMany(Vehicle $vehicle, array $files): void
+    public function storeMany(Vehicle $vehicle, array $files, ?int $featuredIndex = null): void
     {
         if (empty($files)) {
             return;
         }
 
-        $isFirstBatch = ! $this->repository->hasImages($vehicle);
+        $hasExisting = $this->repository->hasImages($vehicle);
         $sortOrder = $this->repository->maxSortOrder($vehicle);
+
+        if ($featuredIndex !== null && isset($files[$featuredIndex])) {
+            $this->repository->clearFeatured($vehicle);
+        }
 
         foreach ($files as $index => $file) {
             $path = $this->uploadImage($file);
 
+            $isFeatured = $featuredIndex !== null
+                ? $index === $featuredIndex
+                : (! $hasExisting && $index === 0);
+
             $this->repository->create($vehicle, [
                 'image'       => $path,
-                'is_featured' => $isFirstBatch && $index === 0,
+                'is_featured' => $isFeatured,
                 'sort_order'  => ++$sortOrder,
             ]);
         }

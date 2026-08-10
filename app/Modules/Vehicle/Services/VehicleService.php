@@ -67,9 +67,9 @@ class VehicleService
     /**
      * Create vehicle.
      */
-    public function create(array $data, array $images = []): Vehicle
+    public function create(array $data, array $images = [], ?int $featuredIndex = null): Vehicle
     {
-        return DB::transaction(function () use ($data, $images) {
+        return DB::transaction(function () use ($data, $images, $featuredIndex) {
 
             if (
                 $this->repository->existsByRegistration(
@@ -85,7 +85,7 @@ class VehicleService
 
             $vehicle = $this->repository->create($data);
 
-            $this->imageService->storeMany($vehicle, $images);
+            $this->imageService->storeMany($vehicle, $images, $featuredIndex);
 
             return $vehicle->fresh(['category', 'images']);
 
@@ -99,10 +99,11 @@ class VehicleService
         Vehicle $vehicle,
         array $data,
         array $images = [],
-        array $removedImageIds = []
+        array $removedImageIds = [],
+        ?int $featuredIndex = null
     ): Vehicle {
 
-        return DB::transaction(function () use ($vehicle, $data, $images, $removedImageIds) {
+        return DB::transaction(function () use ($vehicle, $data, $images, $removedImageIds, $featuredIndex) {
 
             if (
                 isset($data['registration_number']) &&
@@ -122,7 +123,7 @@ class VehicleService
             );
 
             $this->imageService->deleteMany($vehicle, $removedImageIds);
-            $this->imageService->storeMany($vehicle, $images);
+            $this->imageService->storeMany($vehicle, $images, $featuredIndex);
 
             return $vehicle->fresh(['category', 'images']);
 

@@ -33,11 +33,13 @@ class VehicleController extends Controller
     {
         $vehicle = $this->vehicleService->create(
             $request->validated(),
-            $request->file('images', [])
+            $request->file('images', []),
+            $request->input('featured_new_index')
         );
 
         return ApiResponse::success(new VehicleResource($vehicle), 'Vehicle created successfully.', 201);
     }
+
 
     public function show(Vehicle $vehicle): JsonResponse
     {
@@ -47,16 +49,17 @@ class VehicleController extends Controller
     }
 
     public function update(UpdateVehicleRequest $request, Vehicle $vehicle): JsonResponse
-{
-    $vehicle = $this->vehicleService->update(
-        $vehicle,
-        $request->validated(),
-        $request->file('images', []),
-        $request->input('removed_image_ids', [])
-    );
+    {
+        $vehicle = $this->vehicleService->update(
+            $vehicle,
+            $request->validated(),
+            $request->file('images', []),
+            $request->input('removed_image_ids', []),
+            $request->input('featured_new_index')
+        );
 
-    return ApiResponse::success(new VehicleResource($vehicle), 'Vehicle updated successfully.');
-}
+        return ApiResponse::success(new VehicleResource($vehicle), 'Vehicle updated successfully.');
+    }
 
     public function destroy(Vehicle $vehicle): JsonResponse
     {

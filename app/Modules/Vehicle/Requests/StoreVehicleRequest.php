@@ -118,6 +118,8 @@ class StoreVehicleRequest extends FormRequest
                 'max:5120',
             ],
 
+            'featured_new_index' => ['nullable', 'integer', 'min:0'],
+
         ];
     }
 }

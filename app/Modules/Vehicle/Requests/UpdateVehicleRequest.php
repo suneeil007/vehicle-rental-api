@@ -3,12 +3,25 @@
 namespace App\Modules\Vehicle\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class UpdateVehicleRequest extends FormRequest
 {
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function failedValidation(Validator $validator)
+    {
+        throw new HttpResponseException(
+            response()->json([
+                'success' => false,
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422)
+        );
     }
 
     public function rules(): array
@@ -90,6 +103,35 @@ class UpdateVehicleRequest extends FormRequest
             'status' => [
                 'sometimes',
                 'in:available,booked,maintenance,inactive'
+            ],
+
+            'images' => [
+                'nullable',
+                'array',
+                'max:8',
+            ],
+
+            'images.*' => [
+                'file',
+                'image',
+                'mimes:jpeg,png,jpg,webp',
+                'max:5120',
+            ],
+
+            'removed_image_ids' => [
+                'nullable',
+                'array',
+            ],
+
+            'removed_image_ids.*' => [
+                'integer',
+                'exists:vehicle_images,id',
+            ],
+
+            'featured_new_index' => [
+                'nullable',
+                'integer',
+                'min:0',
             ],
 
         ];
