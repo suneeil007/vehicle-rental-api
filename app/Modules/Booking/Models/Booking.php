@@ -46,6 +46,12 @@ class Booking extends Model
 
     protected $fillable = [
 
+        /*
+        |----------------------------------------------------------------------
+        | Identity
+        |----------------------------------------------------------------------
+        */
+
         'slug',
 
         'customer_id',
@@ -53,78 +59,94 @@ class Booking extends Model
 
         'rental_type',
 
+
         /*
-        |--------------------------------------------------------------------------
-        | Branch based pickup/drop
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
+        | Branches
+        |----------------------------------------------------------------------
         |
-        | Used for WITH DRIVER bookings.
+        | Used by both rental types.
+        |
+        | SELF DRIVE
+        |     pickup_branch_id = required
+        |     drop_branch_id   = optional
+        |
+        | WITH DRIVER
+        |     pickup_branch_id = required
+        |     drop_branch_id   = optional
         |
         */
 
         'pickup_branch_id',
         'drop_branch_id',
 
+
         /*
-        |--------------------------------------------------------------------------
-        | Customer location based pickup/drop
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
+        | Customer Locations
+        |----------------------------------------------------------------------
         |
-        | Used for SELF DRIVE bookings.
+        | Used only by WITH DRIVER.
         |
         */
 
         'pickup_location',
         'drop_location',
 
+
         /*
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
         | Dates
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
         */
 
         'pickup_at',
         'expected_return_at',
 
+
         /*
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
         | Amounts
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
         */
 
         'quoted_amount',
         'discount_amount',
         'final_amount',
 
+
         /*
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
         | Approval
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
         */
 
         'approved_by',
         'approved_at',
 
+
         /*
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
         | Trip
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
         */
 
         'trip_id',
 
+
         /*
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
         | Status
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
         */
 
         'status',
 
+
         /*
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
         | Notes
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
         */
 
         'customer_notes',
@@ -141,15 +163,11 @@ class Booking extends Model
     protected $casts = [
 
         'pickup_at' => 'datetime',
-
         'expected_return_at' => 'datetime',
-
         'approved_at' => 'datetime',
 
         'quoted_amount' => 'decimal:2',
-
         'discount_amount' => 'decimal:2',
-
         'final_amount' => 'decimal:2',
     ];
 
@@ -201,9 +219,9 @@ class Booking extends Model
     /**
      * Pickup branch.
      *
-     * Used for WITH DRIVER bookings.
-     *
-     * NULL for SELF DRIVE bookings.
+     * Required for both:
+     * - SELF DRIVE
+     * - WITH DRIVER
      */
     public function pickupBranch()
     {
@@ -218,9 +236,7 @@ class Booking extends Model
     /**
      * Drop branch.
      *
-     * Used for WITH DRIVER bookings.
-     *
-     * NULL for SELF DRIVE bookings.
+     * Optional for both rental types.
      */
     public function dropBranch()
     {
@@ -265,7 +281,7 @@ class Booking extends Model
     */
 
     /**
-     * Check whether this is a Self Drive booking.
+     * Check whether booking is Self Drive.
      */
     public function isSelfDrive(): bool
     {
@@ -274,7 +290,7 @@ class Booking extends Model
 
 
     /**
-     * Check whether this is a With Driver booking.
+     * Check whether booking is With Driver.
      */
     public function isWithDriver(): bool
     {
@@ -289,40 +305,75 @@ class Booking extends Model
     */
 
     /**
-     * Get the pickup point depending on rental type.
-     *
-     * WITH DRIVER:
-     *     Pickup branch name
+     * Get pickup point.
      *
      * SELF DRIVE:
+     *     Pickup branch name
+     *
+     * WITH DRIVER:
      *     Customer pickup location
      */
     public function getPickupPoint(): ?string
     {
-        if ($this->isWithDriver()) {
+        if ($this->isSelfDrive()) {
             return $this->pickupBranch?->name;
         }
 
-        return $this->pickup_location;
+        if ($this->isWithDriver()) {
+            return $this->pickup_location;
+        }
+
+        return null;
     }
 
 
     /**
-     * Get the drop point depending on rental type.
-     *
-     * WITH DRIVER:
-     *     Drop branch name
+     * Get drop point.
      *
      * SELF DRIVE:
+     *     Drop branch name if available,
+     *     otherwise pickup branch name.
+     *
+     * WITH DRIVER:
      *     Customer drop location
      */
     public function getDropPoint(): ?string
     {
-        if ($this->isWithDriver()) {
-            return $this->dropBranch?->name;
+        if ($this->isSelfDrive()) {
+
+            return $this->dropBranch?->name
+                ?? $this->pickupBranch?->name;
         }
 
-        return $this->drop_location;
+        if ($this->isWithDriver()) {
+            return $this->drop_location;
+        }
+
+        return null;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Branch Helpers
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Check whether a pickup branch is assigned.
+     */
+    public function hasPickupBranch(): bool
+    {
+        return !empty($this->pickup_branch_id);
+    }
+
+
+    /**
+     * Check whether a drop branch is assigned.
+     */
+    public function hasDropBranch(): bool
+    {
+        return !empty($this->drop_branch_id);
     }
 
 
@@ -332,12 +383,23 @@ class Booking extends Model
     |--------------------------------------------------------------------------
     */
 
+    /**
+     * Check whether booking is pending.
+     */
     public function isPending(): bool
     {
         return $this->status === self::STATUS_PENDING;
     }
 
 
+    /**
+     * Check whether booking is approved.
+     *
+     * A booking remains logically approved after:
+     * - approval
+     * - trip creation
+     * - completion
+     */
     public function isApproved(): bool
     {
         return in_array(
@@ -352,12 +414,29 @@ class Booking extends Model
     }
 
 
+    /**
+     * Check whether booking can be approved.
+     */
     public function canBeApproved(): bool
     {
         return $this->status === self::STATUS_PENDING;
     }
 
 
+    /**
+     * Check whether booking can be rejected.
+     */
+    public function canBeRejected(): bool
+    {
+        return $this->status === self::STATUS_PENDING;
+    }
+
+
+    /**
+     * Check whether booking can be cancelled.
+     *
+     * Pending and approved bookings can be cancelled.
+     */
     public function canBeCancelled(): bool
     {
         return in_array(
@@ -371,12 +450,11 @@ class Booking extends Model
     }
 
 
-    public function canBeRestored___(): bool
-    {
-        return $this->status === self::STATUS_CANCELLED;
-    }
-
-
+    /**
+     * Check whether booking can be restored.
+     *
+     * Cancelled and rejected bookings can be restored.
+     */
     public function canBeRestored(): bool
     {
         return in_array(
@@ -390,12 +468,22 @@ class Booking extends Model
     }
 
 
+    /**
+     * Check whether booking can be updated.
+     *
+     * Only pending bookings can be edited.
+     */
     public function canBeUpdated(): bool
     {
         return $this->status === self::STATUS_PENDING;
     }
 
 
+    /**
+     * Check whether booking can be deleted.
+     *
+     * Trip-created/completed/approved bookings cannot be deleted.
+     */
     public function canBeDeleted(): bool
     {
         return in_array(
@@ -407,5 +495,86 @@ class Booking extends Model
             ],
             true
         );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Trip Helpers
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Check whether a trip has already been created.
+     */
+    public function hasTrip(): bool
+    {
+        return !empty($this->trip_id);
+    }
+
+
+    /**
+     * Check whether booking can create a trip.
+     */
+    public function canCreateTrip(): bool
+    {
+        return $this->status === self::STATUS_APPROVED
+            && empty($this->trip_id);
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Convenience Helpers
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Get human-readable rental type.
+     */
+    public function getRentalTypeLabel(): string
+    {
+        return match ($this->rental_type) {
+
+            self::RENTAL_TYPE_SELF_DRIVE =>
+                'Self Drive',
+
+            self::RENTAL_TYPE_WITH_DRIVER =>
+                'With Driver',
+
+            default =>
+                'Unknown',
+        };
+    }
+
+
+    /**
+     * Get human-readable status.
+     */
+    public function getStatusLabel(): string
+    {
+        return match ($this->status) {
+
+            self::STATUS_PENDING =>
+                'Pending',
+
+            self::STATUS_APPROVED =>
+                'Approved',
+
+            self::STATUS_REJECTED =>
+                'Rejected',
+
+            self::STATUS_CANCELLED =>
+                'Cancelled',
+
+            self::STATUS_TRIP_CREATED =>
+                'Trip Created',
+
+            self::STATUS_COMPLETED =>
+                'Completed',
+
+            default =>
+                'Unknown',
+        };
     }
 }

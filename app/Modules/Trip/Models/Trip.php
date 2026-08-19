@@ -13,6 +13,7 @@ class Trip extends Model
 {
     use HasFactory;
 
+
     /*
     |--------------------------------------------------------------------------
     | Status Constants
@@ -38,38 +39,31 @@ class Trip extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | Mass Assignable
+    | Fillable
     |--------------------------------------------------------------------------
     */
 
     protected $fillable = [
 
-        'slug',
-
         /*
-        |--------------------------------------------------------------------------
-        | Customer / Vehicle
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
+        | Identity
+        |----------------------------------------------------------------------
         */
+
+        'slug',
 
         'customer_id',
         'vehicle_id',
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Rental
-        |--------------------------------------------------------------------------
-        */
 
         'rental_type',
         'driver_id',
 
 
         /*
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
         | Staff
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
         */
 
         'pickup_staff_id',
@@ -77,9 +71,9 @@ class Trip extends Model
 
 
         /*
-        |--------------------------------------------------------------------------
-        | Cancellation Audit
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
+        | Cancellation
+        |----------------------------------------------------------------------
         */
 
         'cancelled_by',
@@ -88,11 +82,12 @@ class Trip extends Model
 
 
         /*
-        |--------------------------------------------------------------------------
-        | Branch Based Pickup / Drop
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
+        | Branches
+        |----------------------------------------------------------------------
         |
-        | Used for WITH DRIVER.
+        | Required pickup branch for both rental types.
+        | Drop branch is optional.
         |
         */
 
@@ -101,11 +96,11 @@ class Trip extends Model
 
 
         /*
-        |--------------------------------------------------------------------------
-        | Location Based Pickup / Drop
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
+        | Customer Locations
+        |----------------------------------------------------------------------
         |
-        | Used for SELF DRIVE.
+        | Used only for WITH DRIVER.
         |
         */
 
@@ -114,9 +109,9 @@ class Trip extends Model
 
 
         /*
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
         | Schedule
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
         */
 
         'pickup_at',
@@ -125,9 +120,9 @@ class Trip extends Model
 
 
         /*
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
         | Odometer
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
         */
 
         'pickup_odometer',
@@ -135,9 +130,9 @@ class Trip extends Model
 
 
         /*
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
         | Fuel
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
         */
 
         'pickup_fuel',
@@ -145,9 +140,9 @@ class Trip extends Model
 
 
         /*
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
         | Billing
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
         */
 
         'base_amount',
@@ -159,18 +154,18 @@ class Trip extends Model
 
 
         /*
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
         | Status
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
         */
 
         'status',
 
 
         /*
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
         | Notes
-        |--------------------------------------------------------------------------
+        |----------------------------------------------------------------------
         */
 
         'pickup_notes',
@@ -181,31 +176,22 @@ class Trip extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | Attribute Casting
+    | Casts
     |--------------------------------------------------------------------------
     */
 
     protected $casts = [
 
         'pickup_at' => 'datetime',
-
         'expected_return_at' => 'datetime',
-
         'actual_return_at' => 'datetime',
-
         'cancelled_at' => 'datetime',
 
-
         'base_amount' => 'decimal:2',
-
         'extra_km_charge' => 'decimal:2',
-
         'late_return_charge' => 'decimal:2',
-
         'damage_charge' => 'decimal:2',
-
         'fuel_charge' => 'decimal:2',
-
         'total_amount' => 'decimal:2',
     ];
 
@@ -308,8 +294,6 @@ class Trip extends Model
 
     /**
      * Pickup branch.
-     *
-     * Used for WITH DRIVER trips.
      */
     public function pickupBranch()
     {
@@ -323,8 +307,6 @@ class Trip extends Model
 
     /**
      * Drop branch.
-     *
-     * Used for WITH DRIVER trips.
      */
     public function dropBranch()
     {
@@ -342,18 +324,12 @@ class Trip extends Model
     |--------------------------------------------------------------------------
     */
 
-    /**
-     * Check whether this is a Self Drive trip.
-     */
     public function isSelfDrive(): bool
     {
         return $this->rental_type === self::RENTAL_TYPE_SELF_DRIVE;
     }
 
 
-    /**
-     * Check whether this is a With Driver trip.
-     */
     public function isWithDriver(): bool
     {
         return $this->rental_type === self::RENTAL_TYPE_WITH_DRIVER;
@@ -362,45 +338,56 @@ class Trip extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | Trip Location Helpers
+    | Location Helpers
     |--------------------------------------------------------------------------
     */
 
     /**
-     * Get pickup point based on rental type.
-     *
-     * WITH DRIVER:
-     *     Pickup branch name.
+     * Get pickup point.
      *
      * SELF DRIVE:
+     *     Pickup branch.
+     *
+     * WITH DRIVER:
      *     Customer pickup location.
      */
     public function getPickupPoint(): ?string
     {
-        if ($this->isWithDriver()) {
+        if ($this->isSelfDrive()) {
             return $this->pickupBranch?->name;
         }
 
-        return $this->pickup_location;
+        if ($this->isWithDriver()) {
+            return $this->pickup_location;
+        }
+
+        return null;
     }
 
 
     /**
-     * Get drop point based on rental type.
-     *
-     * WITH DRIVER:
-     *     Drop branch name.
+     * Get drop point.
      *
      * SELF DRIVE:
+     *     Drop branch if available.
+     *     Otherwise pickup branch.
+     *
+     * WITH DRIVER:
      *     Customer drop location.
      */
     public function getDropPoint(): ?string
     {
-        if ($this->isWithDriver()) {
-            return $this->dropBranch?->name;
+        if ($this->isSelfDrive()) {
+
+            return $this->dropBranch?->name
+                ?? $this->pickupBranch?->name;
         }
 
-        return $this->drop_location;
+        if ($this->isWithDriver()) {
+            return $this->drop_location;
+        }
+
+        return null;
     }
 
 
@@ -410,18 +397,12 @@ class Trip extends Model
     |--------------------------------------------------------------------------
     */
 
-    /**
-     * Check if trip is scheduled.
-     */
     public function isScheduled(): bool
     {
         return $this->status === self::STATUS_SCHEDULED;
     }
 
 
-    /**
-     * Check if trip is active.
-     */
     public function isActive(): bool
     {
         return in_array(
@@ -435,30 +416,72 @@ class Trip extends Model
     }
 
 
-    /**
-     * Check if trip is completed.
-     */
     public function isCompleted(): bool
     {
         return $this->status === self::STATUS_COMPLETED;
     }
 
 
-    /**
-     * Check if trip is cancelled.
-     */
     public function isCancelled(): bool
     {
         return $this->status === self::STATUS_CANCELLED;
     }
 
 
-    /**
-     * Check if trip can be cancelled.
-     */
     public function canBeCancelled(): bool
     {
         return $this->isScheduled();
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Branch Helpers
+    |--------------------------------------------------------------------------
+    */
+
+    public function hasPickupBranch(): bool
+    {
+        return !empty($this->pickup_branch_id);
+    }
+
+
+    public function hasDropBranch(): bool
+    {
+        return !empty($this->drop_branch_id);
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Trip Validation Helpers
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Check whether trip has required location data.
+     */
+    public function hasRequiredLocations(): bool
+    {
+        if ($this->isSelfDrive()) {
+            return true;
+        }
+
+        if ($this->isWithDriver()) {
+            return !empty($this->pickup_location)
+                && !empty($this->drop_location);
+        }
+
+        return false;
+    }
+
+
+    /**
+     * Check whether trip has required pickup branch.
+     */
+    public function hasRequiredPickupBranch(): bool
+    {
+        return !empty($this->pickup_branch_id);
     }
 
 
@@ -491,9 +514,6 @@ class Trip extends Model
     |--------------------------------------------------------------------------
     */
 
-    /**
-     * Payments made for this trip.
-     */
     public function payments()
     {
         return $this->hasMany(
@@ -504,6 +524,12 @@ class Trip extends Model
     }
 
 
+    /*
+    |--------------------------------------------------------------------------
+    | Booking
+    |--------------------------------------------------------------------------
+    */
+
     public function booking()
     {
         return $this->hasOne(
@@ -512,6 +538,5 @@ class Trip extends Model
             'id'
         );
     }
-
     
 }
