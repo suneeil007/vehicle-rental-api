@@ -45,12 +45,6 @@ class Trip extends Model
 
     protected $fillable = [
 
-        /*
-        |----------------------------------------------------------------------
-        | Identity
-        |----------------------------------------------------------------------
-        */
-
         'slug',
 
         'customer_id',
@@ -59,22 +53,8 @@ class Trip extends Model
         'rental_type',
         'driver_id',
 
-
-        /*
-        |----------------------------------------------------------------------
-        | Staff
-        |----------------------------------------------------------------------
-        */
-
         'pickup_staff_id',
         'return_staff_id',
-
-
-        /*
-        |----------------------------------------------------------------------
-        | Cancellation
-        |----------------------------------------------------------------------
-        */
 
         'cancelled_by',
         'cancellation_reason',
@@ -82,12 +62,16 @@ class Trip extends Model
 
 
         /*
-        |----------------------------------------------------------------------
+        |--------------------------------------------------------------------------
         | Branches
-        |----------------------------------------------------------------------
+        |--------------------------------------------------------------------------
         |
-        | Required pickup branch for both rental types.
-        | Drop branch is optional.
+        | SELF DRIVE:
+        |   pickup_branch_id = REQUIRED
+        |   drop_branch_id   = REQUIRED
+        |
+        | WITH DRIVER:
+        |   both NULL
         |
         */
 
@@ -96,11 +80,15 @@ class Trip extends Model
 
 
         /*
-        |----------------------------------------------------------------------
-        | Customer Locations
-        |----------------------------------------------------------------------
+        |--------------------------------------------------------------------------
+        | Locations
+        |--------------------------------------------------------------------------
         |
-        | Used only for WITH DRIVER.
+        | SELF DRIVE:
+        |   both NULL
+        |
+        | WITH DRIVER:
+        |   both REQUIRED
         |
         */
 
@@ -108,42 +96,15 @@ class Trip extends Model
         'drop_location',
 
 
-        /*
-        |----------------------------------------------------------------------
-        | Schedule
-        |----------------------------------------------------------------------
-        */
-
         'pickup_at',
         'expected_return_at',
         'actual_return_at',
 
-
-        /*
-        |----------------------------------------------------------------------
-        | Odometer
-        |----------------------------------------------------------------------
-        */
-
         'pickup_odometer',
         'return_odometer',
 
-
-        /*
-        |----------------------------------------------------------------------
-        | Fuel
-        |----------------------------------------------------------------------
-        */
-
         'pickup_fuel',
         'return_fuel',
-
-
-        /*
-        |----------------------------------------------------------------------
-        | Billing
-        |----------------------------------------------------------------------
-        */
 
         'base_amount',
         'extra_km_charge',
@@ -152,21 +113,7 @@ class Trip extends Model
         'fuel_charge',
         'total_amount',
 
-
-        /*
-        |----------------------------------------------------------------------
-        | Status
-        |----------------------------------------------------------------------
-        */
-
         'status',
-
-
-        /*
-        |----------------------------------------------------------------------
-        | Notes
-        |----------------------------------------------------------------------
-        */
 
         'pickup_notes',
         'return_notes',
@@ -182,17 +129,35 @@ class Trip extends Model
 
     protected $casts = [
 
-        'pickup_at' => 'datetime',
-        'expected_return_at' => 'datetime',
-        'actual_return_at' => 'datetime',
-        'cancelled_at' => 'datetime',
+        'pickup_at' =>
+            'datetime',
 
-        'base_amount' => 'decimal:2',
-        'extra_km_charge' => 'decimal:2',
-        'late_return_charge' => 'decimal:2',
-        'damage_charge' => 'decimal:2',
-        'fuel_charge' => 'decimal:2',
-        'total_amount' => 'decimal:2',
+        'expected_return_at' =>
+            'datetime',
+
+        'actual_return_at' =>
+            'datetime',
+
+        'cancelled_at' =>
+            'datetime',
+
+        'base_amount' =>
+            'decimal:2',
+
+        'extra_km_charge' =>
+            'decimal:2',
+
+        'late_return_charge' =>
+            'decimal:2',
+
+        'damage_charge' =>
+            'decimal:2',
+
+        'fuel_charge' =>
+            'decimal:2',
+
+        'total_amount' =>
+            'decimal:2',
     ];
 
 
@@ -214,9 +179,6 @@ class Trip extends Model
     |--------------------------------------------------------------------------
     */
 
-    /**
-     * Customer who rented the vehicle.
-     */
     public function customer()
     {
         return $this->belongsTo(
@@ -227,9 +189,6 @@ class Trip extends Model
     }
 
 
-    /**
-     * Driver assigned to the trip.
-     */
     public function driver()
     {
         return $this->belongsTo(
@@ -240,9 +199,6 @@ class Trip extends Model
     }
 
 
-    /**
-     * Staff who handed over the vehicle.
-     */
     public function pickupStaff()
     {
         return $this->belongsTo(
@@ -253,9 +209,6 @@ class Trip extends Model
     }
 
 
-    /**
-     * Staff who received the vehicle back.
-     */
     public function returnStaff()
     {
         return $this->belongsTo(
@@ -266,9 +219,6 @@ class Trip extends Model
     }
 
 
-    /**
-     * User who cancelled the trip.
-     */
     public function cancelledBy()
     {
         return $this->belongsTo(
@@ -279,9 +229,6 @@ class Trip extends Model
     }
 
 
-    /**
-     * Vehicle used in the trip.
-     */
     public function vehicle()
     {
         return $this->belongsTo(
@@ -292,9 +239,6 @@ class Trip extends Model
     }
 
 
-    /**
-     * Pickup branch.
-     */
     public function pickupBranch()
     {
         return $this->belongsTo(
@@ -305,9 +249,6 @@ class Trip extends Model
     }
 
 
-    /**
-     * Drop branch.
-     */
     public function dropBranch()
     {
         return $this->belongsTo(
@@ -326,13 +267,15 @@ class Trip extends Model
 
     public function isSelfDrive(): bool
     {
-        return $this->rental_type === self::RENTAL_TYPE_SELF_DRIVE;
+        return $this->rental_type ===
+            self::RENTAL_TYPE_SELF_DRIVE;
     }
 
 
     public function isWithDriver(): bool
     {
-        return $this->rental_type === self::RENTAL_TYPE_WITH_DRIVER;
+        return $this->rental_type ===
+            self::RENTAL_TYPE_WITH_DRIVER;
     }
 
 
@@ -342,50 +285,53 @@ class Trip extends Model
     |--------------------------------------------------------------------------
     */
 
-    /**
-     * Get pickup point.
-     *
-     * SELF DRIVE:
-     *     Pickup branch.
-     *
-     * WITH DRIVER:
-     *     Customer pickup location.
-     */
     public function getPickupPoint(): ?string
     {
+        /*
+        | Self Drive = Pickup Branch
+        */
+
         if ($this->isSelfDrive()) {
+
             return $this->pickupBranch?->name;
         }
 
+
+        /*
+        | With Driver = Pickup Location
+        */
+
         if ($this->isWithDriver()) {
+
             return $this->pickup_location;
         }
+
 
         return null;
     }
 
 
-    /**
-     * Get drop point.
-     *
-     * SELF DRIVE:
-     *     Drop branch if available.
-     *     Otherwise pickup branch.
-     *
-     * WITH DRIVER:
-     *     Customer drop location.
-     */
     public function getDropPoint(): ?string
     {
+        /*
+        | Self Drive = Drop Branch
+        */
+
         if ($this->isSelfDrive()) {
 
-            return $this->dropBranch?->name
-                ?? $this->pickupBranch?->name;
+            return $this->dropBranch?->name;
         }
 
+
+        /*
+        | With Driver = Drop Location
+        */
+
         if ($this->isWithDriver()) {
+
             return $this->drop_location;
         }
+
 
         return null;
     }
@@ -399,7 +345,8 @@ class Trip extends Model
 
     public function isScheduled(): bool
     {
-        return $this->status === self::STATUS_SCHEDULED;
+        return $this->status ===
+            self::STATUS_SCHEDULED;
     }
 
 
@@ -418,13 +365,15 @@ class Trip extends Model
 
     public function isCompleted(): bool
     {
-        return $this->status === self::STATUS_COMPLETED;
+        return $this->status ===
+            self::STATUS_COMPLETED;
     }
 
 
     public function isCancelled(): bool
     {
-        return $this->status === self::STATUS_CANCELLED;
+        return $this->status ===
+            self::STATUS_CANCELLED;
     }
 
 
@@ -442,13 +391,17 @@ class Trip extends Model
 
     public function hasPickupBranch(): bool
     {
-        return !empty($this->pickup_branch_id);
+        return !empty(
+            $this->pickup_branch_id
+        );
     }
 
 
     public function hasDropBranch(): bool
     {
-        return !empty($this->drop_branch_id);
+        return !empty(
+            $this->drop_branch_id
+        );
     }
 
 
@@ -458,30 +411,52 @@ class Trip extends Model
     |--------------------------------------------------------------------------
     */
 
-    /**
-     * Check whether trip has required location data.
-     */
     public function hasRequiredLocations(): bool
     {
+        /*
+        | Self Drive does NOT need locations.
+        */
+
         if ($this->isSelfDrive()) {
             return true;
         }
 
+
+        /*
+        | With Driver needs both locations.
+        */
+
         if ($this->isWithDriver()) {
+
             return !empty($this->pickup_location)
-                && !empty($this->drop_location);
+                &&
+                !empty($this->drop_location);
         }
+
 
         return false;
     }
 
 
-    /**
-     * Check whether trip has required pickup branch.
-     */
     public function hasRequiredPickupBranch(): bool
     {
-        return !empty($this->pickup_branch_id);
+        /*
+        | Only Self Drive requires pickup branch.
+        */
+
+        if ($this->isSelfDrive()) {
+
+            return !empty(
+                $this->pickup_branch_id
+            );
+        }
+
+
+        /*
+        | With Driver does not require branch.
+        */
+
+        return true;
     }
 
 
@@ -491,17 +466,17 @@ class Trip extends Model
     |--------------------------------------------------------------------------
     */
 
-    /**
-     * Calculate traveled distance in kilometers.
-     */
     public function getDistanceAttribute(): ?int
     {
         if (
-            $this->pickup_odometer !== null &&
+            $this->pickup_odometer !== null
+            &&
             $this->return_odometer !== null
         ) {
+
             return $this->return_odometer
-                - $this->pickup_odometer;
+                -
+                $this->pickup_odometer;
         }
 
         return null;
@@ -538,5 +513,4 @@ class Trip extends Model
             'id'
         );
     }
-    
 }

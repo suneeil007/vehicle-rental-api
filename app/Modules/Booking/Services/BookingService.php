@@ -13,7 +13,6 @@ use App\Modules\Trip\Models\Trip;
 use App\Modules\Trip\Services\TripService;
 use App\Modules\Booking\Repositories\Contracts\BookingRepositoryInterface;
 
-
 class BookingService
 {
     public function __construct(
@@ -22,22 +21,24 @@ class BookingService
     ) {}
 
 
-    /**
-     * --------------------------------------------------------------------------
-     * List bookings
-     * --------------------------------------------------------------------------
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | List bookings
+    |--------------------------------------------------------------------------
+    */
+
     public function getAll(array $filters = [])
     {
         return $this->repository->getAll($filters);
     }
 
 
-    /**
-     * --------------------------------------------------------------------------
-     * Show booking
-     * --------------------------------------------------------------------------
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Show booking
+    |--------------------------------------------------------------------------
+    */
+
     public function getById(int $id): Booking
     {
         $booking = $this->repository->getById($id);
@@ -52,41 +53,38 @@ class BookingService
     }
 
 
-    /**
-     * --------------------------------------------------------------------------
-     * Create booking
-     * --------------------------------------------------------------------------
-     *
-     * RENTAL TYPE RULES
-     *
-     * SELF DRIVE
-     * - Customer collects vehicle from pickup branch.
-     * - pickup_branch_id is required.
-     * - drop_branch_id is optional.
-     * - pickup_location must be NULL.
-     * - drop_location must be NULL.
-     *
-     * WITH DRIVER
-     * - Vehicle/driver starts from pickup branch.
-     * - pickup_branch_id is required.
-     * - drop_branch_id is optional.
-     * - pickup_location is required.
-     * - drop_location is required.
-     * - Driver is NOT assigned at booking creation.
-     *
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Create booking
+    |--------------------------------------------------------------------------
+    |
+    | SELF DRIVE
+    |
+    | pickup_branch_id = REQUIRED
+    | drop_branch_id   = REQUIRED
+    | pickup_location  = NULL
+    | drop_location    = NULL
+    |
+    | WITH DRIVER
+    |
+    | pickup_branch_id = NULL
+    | drop_branch_id   = NULL
+    | pickup_location  = REQUIRED
+    | drop_location    = REQUIRED
+    |
+    */
+
     public function create(array $data): Booking
     {
         return DB::transaction(function () use ($data) {
 
             /*
             |--------------------------------------------------------------------------
-            | Determine rental type
+            | Rental type
             |--------------------------------------------------------------------------
             */
 
-            $rentalType =
-                $data['rental_type']
+            $rentalType = $data['rental_type']
                 ?? Booking::RENTAL_TYPE_SELF_DRIVE;
 
 
@@ -128,7 +126,8 @@ class BookingService
             | SELF DRIVE
             |--------------------------------------------------------------------------
             |
-            | Customer visits pickup branch and collects vehicle.
+            | Pickup = Branch
+            | Drop   = Branch
             |
             */
 
@@ -162,7 +161,21 @@ class BookingService
 
                 /*
                 |--------------------------------------------------------------------------
-                | Customer locations are not used
+                | Drop branch required
+                |--------------------------------------------------------------------------
+                */
+
+                if (!$dropBranchId) {
+
+                    throw new ConflictException(
+                        'Drop branch is required for a self drive booking.'
+                    );
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Locations are NOT allowed
                 |--------------------------------------------------------------------------
                 */
 
@@ -179,6 +192,10 @@ class BookingService
                         'Drop location cannot be used for a self drive booking.'
                     );
                 }
+
+
+                $pickupLocation = null;
+                $dropLocation = null;
             }
 
 
@@ -187,7 +204,8 @@ class BookingService
             | WITH DRIVER
             |--------------------------------------------------------------------------
             |
-            | Driver takes vehicle from branch to customer location.
+            | Pickup = Customer location
+            | Drop   = Customer location
             |
             */
 
@@ -195,14 +213,6 @@ class BookingService
                 $rentalType ===
                 Booking::RENTAL_TYPE_WITH_DRIVER
             ) {
-
-                $pickupBranchId =
-                    $data['pickup_branch_id']
-                    ?? null;
-
-                $dropBranchId =
-                    $data['drop_branch_id']
-                    ?? null;
 
                 $pickupLocation =
                     $data['pickup_location']
@@ -215,21 +225,7 @@ class BookingService
 
                 /*
                 |--------------------------------------------------------------------------
-                | Pickup branch required
-                |--------------------------------------------------------------------------
-                */
-
-                if (!$pickupBranchId) {
-
-                    throw new ConflictException(
-                        'Pickup branch is required for a driver booking.'
-                    );
-                }
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | Customer pickup location required
+                | Pickup location required
                 |--------------------------------------------------------------------------
                 */
 
@@ -243,7 +239,7 @@ class BookingService
 
                 /*
                 |--------------------------------------------------------------------------
-                | Customer drop location required
+                | Drop location required
                 |--------------------------------------------------------------------------
                 */
 
@@ -253,6 +249,31 @@ class BookingService
                         'Drop location is required for a driver booking.'
                     );
                 }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Branches are NOT allowed
+                |--------------------------------------------------------------------------
+                */
+
+                if (!empty($data['pickup_branch_id'])) {
+
+                    throw new ConflictException(
+                        'Pickup branch cannot be used for a driver booking.'
+                    );
+                }
+
+                if (!empty($data['drop_branch_id'])) {
+
+                    throw new ConflictException(
+                        'Drop branch cannot be used for a driver booking.'
+                    );
+                }
+
+
+                $pickupBranchId = null;
+                $dropBranchId = null;
             }
 
 
@@ -318,7 +339,7 @@ class BookingService
 
             /*
             |--------------------------------------------------------------------------
-            | Calculate final amount on backend
+            | Calculate final amount
             |--------------------------------------------------------------------------
             */
 
@@ -337,12 +358,6 @@ class BookingService
 
             return $this->repository->create([
 
-                /*
-                |--------------------------------------------------------------------------
-                | Identity
-                |--------------------------------------------------------------------------
-                */
-
                 'slug' =>
                     (string) Str::uuid(),
 
@@ -358,7 +373,7 @@ class BookingService
 
                 /*
                 |--------------------------------------------------------------------------
-                | Branch / Location
+                | Branches
                 |--------------------------------------------------------------------------
                 */
 
@@ -367,6 +382,13 @@ class BookingService
 
                 'drop_branch_id' =>
                     $dropBranchId,
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Locations
+                |--------------------------------------------------------------------------
+                */
 
                 'pickup_location' =>
                     $pickupLocation,
@@ -427,22 +449,21 @@ class BookingService
                 'admin_notes' =>
                     $data['admin_notes']
                     ?? null,
-
             ]);
         });
     }
 
 
-    /**
-     * --------------------------------------------------------------------------
-     * Approve booking
-     * --------------------------------------------------------------------------
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Approve booking
+    |--------------------------------------------------------------------------
+    */
+
     public function approve(
         Booking $booking,
         int $userId
     ) {
-
         if (!$booking->canBeApproved()) {
 
             throw new ConflictException(
@@ -450,11 +471,9 @@ class BookingService
             );
         }
 
-
         return $this->repository->update(
             $booking,
             [
-
                 'status' =>
                     Booking::STATUS_APPROVED,
 
@@ -463,21 +482,20 @@ class BookingService
 
                 'approved_at' =>
                     now(),
-
             ]
         );
     }
 
 
-    /**
-     * --------------------------------------------------------------------------
-     * Reject booking
-     * --------------------------------------------------------------------------
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Reject booking
+    |--------------------------------------------------------------------------
+    */
+
     public function reject(
         Booking $booking
     ) {
-
         if (!$booking->isPending()) {
 
             throw new ConflictException(
@@ -485,28 +503,25 @@ class BookingService
             );
         }
 
-
         return $this->repository->update(
             $booking,
             [
-
                 'status' =>
                     Booking::STATUS_REJECTED,
-
             ]
         );
     }
 
 
-    /**
-     * --------------------------------------------------------------------------
-     * Cancel booking
-     * --------------------------------------------------------------------------
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Cancel booking
+    |--------------------------------------------------------------------------
+    */
+
     public function cancel(
         Booking $booking
     ) {
-
         if (!$booking->canBeCancelled()) {
 
             throw new ConflictException(
@@ -514,35 +529,22 @@ class BookingService
             );
         }
 
-
         return $this->repository->update(
             $booking,
             [
-
                 'status' =>
                     Booking::STATUS_CANCELLED,
-
             ]
         );
     }
 
 
-    /**
-     * --------------------------------------------------------------------------
-     * Convert booking into trip
-     * --------------------------------------------------------------------------
-     *
-     * APPROVED BOOKING
-     *       ↓
-     * TripService::create()
-     *       ↓
-     * Trip created
-     *       ↓
-     * Booking linked to Trip
-     *       ↓
-     * Booking status = trip_created
-     *
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Convert booking into trip
+    |--------------------------------------------------------------------------
+    */
+
     public function createTrip(
         Booking $booking
     ): Booking {
@@ -602,21 +604,8 @@ class BookingService
 
             $tripData = [
 
-                /*
-                |--------------------------------------------------------------------------
-                | Trip identity
-                |--------------------------------------------------------------------------
-                */
-
                 'slug' =>
                     (string) Str::uuid(),
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | Customer / Vehicle
-                |--------------------------------------------------------------------------
-                */
 
                 'customer_id' =>
                     $booking->customer_id,
@@ -624,22 +613,8 @@ class BookingService
                 'vehicle_id' =>
                     $booking->vehicle_id,
 
-
-                /*
-                |--------------------------------------------------------------------------
-                | Rental type
-                |--------------------------------------------------------------------------
-                */
-
                 'rental_type' =>
                     $booking->rental_type,
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | Schedule
-                |--------------------------------------------------------------------------
-                */
 
                 'pickup_at' =>
                     $booking->pickup_at,
@@ -647,38 +622,17 @@ class BookingService
                 'expected_return_at' =>
                     $booking->expected_return_at,
 
-
-                /*
-                |--------------------------------------------------------------------------
-                | Vehicle starting condition
-                |--------------------------------------------------------------------------
-                */
-
                 'pickup_odometer' =>
                     0,
 
                 'pickup_fuel' =>
                     'full',
 
-
-                /*
-                |--------------------------------------------------------------------------
-                | Amounts
-                |--------------------------------------------------------------------------
-                */
-
                 'base_amount' =>
                     $booking->final_amount,
 
                 'total_amount' =>
                     $booking->final_amount,
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | Status
-                |--------------------------------------------------------------------------
-                */
 
                 'status' =>
                     Trip::STATUS_SCHEDULED,
@@ -689,21 +643,12 @@ class BookingService
             |--------------------------------------------------------------------------
             | SELF DRIVE
             |--------------------------------------------------------------------------
-            |
-            | Customer visits branch to collect vehicle.
-            |
             */
 
             if (
                 $booking->rental_type ===
                 Booking::RENTAL_TYPE_SELF_DRIVE
             ) {
-
-                /*
-                |--------------------------------------------------------------------------
-                | Pickup branch required
-                |--------------------------------------------------------------------------
-                */
 
                 if (!$booking->pickup_branch_id) {
 
@@ -712,12 +657,13 @@ class BookingService
                     );
                 }
 
+                if (!$booking->drop_branch_id) {
 
-                /*
-                |--------------------------------------------------------------------------
-                | Branch based trip
-                |--------------------------------------------------------------------------
-                */
+                    throw new ConflictException(
+                        'Drop branch is required for a self drive trip.'
+                    );
+                }
+
 
                 $tripData['pickup_branch_id'] =
                     $booking->pickup_branch_id;
@@ -725,17 +671,17 @@ class BookingService
                 $tripData['drop_branch_id'] =
                     $booking->drop_branch_id;
 
-
-                /*
-                |--------------------------------------------------------------------------
-                | No customer location
-                |--------------------------------------------------------------------------
-                */
-
                 $tripData['pickup_location'] =
                     null;
 
                 $tripData['drop_location'] =
+                    null;
+
+                /*
+                | Self drive has no driver
+                */
+
+                $tripData['driver_id'] =
                     null;
             }
 
@@ -744,35 +690,12 @@ class BookingService
             |--------------------------------------------------------------------------
             | WITH DRIVER
             |--------------------------------------------------------------------------
-            |
-            | Driver takes vehicle from branch to customer location.
-            |
             */
 
             if (
                 $booking->rental_type ===
                 Booking::RENTAL_TYPE_WITH_DRIVER
             ) {
-
-                /*
-                |--------------------------------------------------------------------------
-                | Pickup branch required
-                |--------------------------------------------------------------------------
-                */
-
-                if (!$booking->pickup_branch_id) {
-
-                    throw new ConflictException(
-                        'Pickup branch is required for a driver trip.'
-                    );
-                }
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | Customer locations required
-                |--------------------------------------------------------------------------
-                */
 
                 if (
                     empty($booking->pickup_location)
@@ -787,36 +710,27 @@ class BookingService
 
 
                 /*
-                |--------------------------------------------------------------------------
-                | Starting branch
-                |--------------------------------------------------------------------------
+                | No branches for With Driver
                 */
 
                 $tripData['pickup_branch_id'] =
-                    $booking->pickup_branch_id;
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | Optional ending branch
-                |--------------------------------------------------------------------------
-                */
+                    null;
 
                 $tripData['drop_branch_id'] =
-                    $booking->drop_branch_id;
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | Customer locations
-                |--------------------------------------------------------------------------
-                */
+                    null;
 
                 $tripData['pickup_location'] =
                     $booking->pickup_location;
 
                 $tripData['drop_location'] =
                     $booking->drop_location;
+
+                /*
+                | Driver can be assigned later
+                */
+
+                $tripData['driver_id'] =
+                    null;
             }
 
 
@@ -844,7 +758,6 @@ class BookingService
 
                 'status' =>
                     Booking::STATUS_TRIP_CREATED,
-
             ]);
 
 
@@ -865,15 +778,15 @@ class BookingService
     }
 
 
-    /**
-     * --------------------------------------------------------------------------
-     * Restore booking
-     * --------------------------------------------------------------------------
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Restore booking
+    |--------------------------------------------------------------------------
+    */
+
     public function restore(
         Booking $booking
     ) {
-
         if (!$booking->canBeRestored()) {
 
             throw new ConflictException(
@@ -881,34 +794,26 @@ class BookingService
             );
         }
 
-
         return $this->repository->update(
             $booking,
             [
-
                 'status' =>
                     Booking::STATUS_PENDING,
-
             ]
         );
     }
 
 
-    /**
-     * --------------------------------------------------------------------------
-     * Update booking
-     * --------------------------------------------------------------------------
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Update booking
+    |--------------------------------------------------------------------------
+    */
+
     public function update(
         Booking $booking,
         array $data
     ) {
-
-        /*
-        |--------------------------------------------------------------------------
-        | Booking must be pending
-        |--------------------------------------------------------------------------
-        */
 
         if (!$booking->canBeUpdated()) {
 
@@ -920,7 +825,7 @@ class BookingService
 
         /*
         |--------------------------------------------------------------------------
-        | Determine rental type
+        | Rental type
         |--------------------------------------------------------------------------
         */
 
@@ -952,7 +857,7 @@ class BookingService
 
         /*
         |--------------------------------------------------------------------------
-        | Normalize fields
+        | Normalize
         |--------------------------------------------------------------------------
         */
 
@@ -967,9 +872,6 @@ class BookingService
         |--------------------------------------------------------------------------
         | SELF DRIVE
         |--------------------------------------------------------------------------
-        |
-        | Customer collects vehicle from branch.
-        |
         */
 
         if (
@@ -994,12 +896,6 @@ class BookingService
                     : $booking->drop_branch_id;
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | Pickup branch required
-            |--------------------------------------------------------------------------
-            */
-
             if (!$pickupBranchId) {
 
                 throw new ConflictException(
@@ -1008,14 +904,19 @@ class BookingService
             }
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | Locations cannot be used
-            |--------------------------------------------------------------------------
-            */
+            if (!$dropBranchId) {
+
+                throw new ConflictException(
+                    'Drop branch is required for a self drive booking.'
+                );
+            }
+
 
             if (
-                array_key_exists('pickup_location', $data)
+                array_key_exists(
+                    'pickup_location',
+                    $data
+                )
                 &&
                 !empty($data['pickup_location'])
             ) {
@@ -1025,8 +926,12 @@ class BookingService
                 );
             }
 
+
             if (
-                array_key_exists('drop_location', $data)
+                array_key_exists(
+                    'drop_location',
+                    $data
+                )
                 &&
                 !empty($data['drop_location'])
             ) {
@@ -1035,6 +940,10 @@ class BookingService
                     'Drop location cannot be used for a self drive booking.'
                 );
             }
+
+
+            $pickupLocation = null;
+            $dropLocation = null;
         }
 
 
@@ -1042,31 +951,12 @@ class BookingService
         |--------------------------------------------------------------------------
         | WITH DRIVER
         |--------------------------------------------------------------------------
-        |
-        | Vehicle/driver goes to customer location.
-        |
         */
 
         if (
             $rentalType ===
             Booking::RENTAL_TYPE_WITH_DRIVER
         ) {
-
-            $pickupBranchId =
-                array_key_exists(
-                    'pickup_branch_id',
-                    $data
-                )
-                    ? $data['pickup_branch_id']
-                    : $booking->pickup_branch_id;
-
-            $dropBranchId =
-                array_key_exists(
-                    'drop_branch_id',
-                    $data
-                )
-                    ? $data['drop_branch_id']
-                    : $booking->drop_branch_id;
 
             $pickupLocation =
                 array_key_exists(
@@ -1085,26 +975,6 @@ class BookingService
                     : $booking->drop_location;
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | Pickup branch required
-            |--------------------------------------------------------------------------
-            */
-
-            if (!$pickupBranchId) {
-
-                throw new ConflictException(
-                    'Pickup branch is required for a driver booking.'
-                );
-            }
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | Customer pickup location required
-            |--------------------------------------------------------------------------
-            */
-
             if (empty($pickupLocation)) {
 
                 throw new ConflictException(
@@ -1113,18 +983,46 @@ class BookingService
             }
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | Customer drop location required
-            |--------------------------------------------------------------------------
-            */
-
             if (empty($dropLocation)) {
 
                 throw new ConflictException(
                     'Drop location is required for a driver booking.'
                 );
             }
+
+
+            if (
+                array_key_exists(
+                    'pickup_branch_id',
+                    $data
+                )
+                &&
+                !empty($data['pickup_branch_id'])
+            ) {
+
+                throw new ConflictException(
+                    'Pickup branch cannot be used for a driver booking.'
+                );
+            }
+
+
+            if (
+                array_key_exists(
+                    'drop_branch_id',
+                    $data
+                )
+                &&
+                !empty($data['drop_branch_id'])
+            ) {
+
+                throw new ConflictException(
+                    'Drop branch cannot be used for a driver booking.'
+                );
+            }
+
+
+            $pickupBranchId = null;
+            $dropBranchId = null;
         }
 
 
@@ -1143,12 +1041,6 @@ class BookingService
             ?? $booking->discount_amount;
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | Validate quoted amount
-        |--------------------------------------------------------------------------
-        */
-
         if ((float) $quotedAmount < 0) {
 
             throw new ConflictException(
@@ -1157,12 +1049,6 @@ class BookingService
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | Validate discount
-        |--------------------------------------------------------------------------
-        */
-
         if ((float) $discountAmount < 0) {
 
             throw new ConflictException(
@@ -1170,12 +1056,6 @@ class BookingService
             );
         }
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Discount cannot exceed quoted amount
-        |--------------------------------------------------------------------------
-        */
 
         if (
             (float) $discountAmount >
@@ -1188,12 +1068,6 @@ class BookingService
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | Calculate final amount
-        |--------------------------------------------------------------------------
-        */
-
         $finalAmount = max(
             (float) $quotedAmount -
             (float) $discountAmount,
@@ -1203,19 +1077,13 @@ class BookingService
 
         /*
         |--------------------------------------------------------------------------
-        | Update booking
+        | Update
         |--------------------------------------------------------------------------
         */
 
         return $this->repository->update(
             $booking,
             [
-
-                /*
-                |--------------------------------------------------------------------------
-                | Customer / Vehicle
-                |--------------------------------------------------------------------------
-                */
 
                 'customer_id' =>
                     $data['customer_id']
@@ -1230,9 +1098,7 @@ class BookingService
 
 
                 /*
-                |--------------------------------------------------------------------------
-                | Branch / Location
-                |--------------------------------------------------------------------------
+                | Branch
                 */
 
                 'pickup_branch_id' =>
@@ -1240,6 +1106,11 @@ class BookingService
 
                 'drop_branch_id' =>
                     $dropBranchId,
+
+
+                /*
+                | Location
+                */
 
                 'pickup_location' =>
                     $pickupLocation,
@@ -1249,9 +1120,7 @@ class BookingService
 
 
                 /*
-                |--------------------------------------------------------------------------
                 | Dates
-                |--------------------------------------------------------------------------
                 */
 
                 'pickup_at' =>
@@ -1264,9 +1133,7 @@ class BookingService
 
 
                 /*
-                |--------------------------------------------------------------------------
-                | Amounts
-                |--------------------------------------------------------------------------
+                | Amount
                 */
 
                 'quoted_amount' =>
@@ -1280,9 +1147,7 @@ class BookingService
 
 
                 /*
-                |--------------------------------------------------------------------------
                 | Notes
-                |--------------------------------------------------------------------------
                 */
 
                 'customer_notes' =>
@@ -1292,17 +1157,17 @@ class BookingService
                 'admin_notes' =>
                     $data['admin_notes']
                     ?? $booking->admin_notes,
-
             ]
         );
     }
 
 
-    /**
-     * --------------------------------------------------------------------------
-     * Delete booking
-     * --------------------------------------------------------------------------
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Delete booking
+    |--------------------------------------------------------------------------
+    */
+
     public function delete(
         Booking $booking
     ) {
@@ -1313,7 +1178,6 @@ class BookingService
                 'Booking cannot be deleted in its current status.'
             );
         }
-
 
         return $this->repository->delete(
             $booking

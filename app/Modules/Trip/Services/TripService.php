@@ -53,6 +53,23 @@ class TripService
     |--------------------------------------------------------------------------
     | Create Trip
     |--------------------------------------------------------------------------
+    |
+    | SELF DRIVE
+    |
+    | pickup_branch_id = REQUIRED
+    | drop_branch_id   = REQUIRED
+    | pickup_location  = NULL
+    | drop_location    = NULL
+    | driver_id        = NULL
+    |
+    | WITH DRIVER
+    |
+    | pickup_branch_id = NULL
+    | drop_branch_id   = NULL
+    | pickup_location  = REQUIRED
+    | drop_location    = REQUIRED
+    | driver_id        = NULL initially
+    |
     */
 
     public function create(array $data): Trip
@@ -60,9 +77,9 @@ class TripService
         return DB::transaction(function () use ($data) {
 
             /*
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             | Rental Type
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             */
 
             $rentalType =
@@ -71,9 +88,9 @@ class TripService
 
 
             /*
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             | Validate Rental Type
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             */
 
             if (!in_array(
@@ -84,6 +101,7 @@ class TripService
                 ],
                 true
             )) {
+
                 throw new ConflictException(
                     'Invalid rental type.'
                 );
@@ -91,9 +109,9 @@ class TripService
 
 
             /*
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             | Vehicle Availability
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             */
 
             if (
@@ -101,6 +119,7 @@ class TripService
                     (int) $data['vehicle_id']
                 )
             ) {
+
                 throw new ConflictException(
                     'Vehicle already has an active trip.'
                 );
@@ -108,14 +127,15 @@ class TripService
 
 
             /*
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             | Pickup Odometer
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             */
 
             $pickupOdometer =
                 $data['pickup_odometer']
                 ?? 0;
+
 
             if ((float) $pickupOdometer < 0) {
 
@@ -126,9 +146,9 @@ class TripService
 
 
             /*
-            |------------------------------------------------------------------
-            | Normalize Fields
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
+            | Normalize
+            |--------------------------------------------------------------------------
             */
 
             $pickupBranchId = null;
@@ -139,14 +159,9 @@ class TripService
 
 
             /*
-            |==================================================================
+            |--------------------------------------------------------------------------
             | SELF DRIVE
-            |==================================================================
-            |
-            | Pickup branch = REQUIRED
-            | Drop branch   = OPTIONAL
-            | Locations     = NULL
-            |
+            |--------------------------------------------------------------------------
             */
 
             if (
@@ -164,9 +179,7 @@ class TripService
 
 
                 /*
-                |--------------------------------------------------------------
                 | Pickup branch required
-                |--------------------------------------------------------------
                 */
 
                 if (!$pickupBranchId) {
@@ -178,9 +191,19 @@ class TripService
 
 
                 /*
-                |--------------------------------------------------------------
-                | Locations cannot be used
-                |--------------------------------------------------------------
+                | Drop branch required
+                */
+
+                if (!$dropBranchId) {
+
+                    throw new ConflictException(
+                        'Drop branch is required for a self drive trip.'
+                    );
+                }
+
+
+                /*
+                | Locations forbidden
                 */
 
                 if (!empty($data['pickup_location'])) {
@@ -190,39 +213,37 @@ class TripService
                     );
                 }
 
+
                 if (!empty($data['drop_location'])) {
 
                     throw new ConflictException(
                         'Drop location cannot be used for a self drive trip.'
                     );
                 }
+
+
+                $pickupLocation = null;
+                $dropLocation = null;
+
+
+                /*
+                | Self drive does not use driver
+                */
+
+                $data['driver_id'] = null;
             }
 
 
             /*
-            |==================================================================
+            |--------------------------------------------------------------------------
             | WITH DRIVER
-            |==================================================================
-            |
-            | Pickup branch   = REQUIRED
-            | Drop branch     = OPTIONAL
-            | Pickup location = REQUIRED
-            | Drop location   = REQUIRED
-            |
+            |--------------------------------------------------------------------------
             */
 
             if (
                 $rentalType ===
                 Trip::RENTAL_TYPE_WITH_DRIVER
             ) {
-
-                $pickupBranchId =
-                    $data['pickup_branch_id']
-                    ?? null;
-
-                $dropBranchId =
-                    $data['drop_branch_id']
-                    ?? null;
 
                 $pickupLocation =
                     $data['pickup_location']
@@ -234,23 +255,7 @@ class TripService
 
 
                 /*
-                |--------------------------------------------------------------
-                | Pickup branch required
-                |--------------------------------------------------------------
-                */
-
-                if (!$pickupBranchId) {
-
-                    throw new ConflictException(
-                        'Pickup branch is required for a driver trip.'
-                    );
-                }
-
-
-                /*
-                |--------------------------------------------------------------
                 | Pickup location required
-                |--------------------------------------------------------------
                 */
 
                 if (empty($pickupLocation)) {
@@ -262,9 +267,7 @@ class TripService
 
 
                 /*
-                |--------------------------------------------------------------
                 | Drop location required
-                |--------------------------------------------------------------
                 */
 
                 if (empty($dropLocation)) {
@@ -273,18 +276,52 @@ class TripService
                         'Drop location is required for a driver trip.'
                     );
                 }
+
+
+                /*
+                | Branches forbidden
+                */
+
+                if (!empty($data['pickup_branch_id'])) {
+
+                    throw new ConflictException(
+                        'Pickup branch cannot be used for a driver trip.'
+                    );
+                }
+
+
+                if (!empty($data['drop_branch_id'])) {
+
+                    throw new ConflictException(
+                        'Drop branch cannot be used for a driver trip.'
+                    );
+                }
+
+
+                $pickupBranchId = null;
+                $dropBranchId = null;
+
+
+                /*
+                | Driver is optional at creation.
+                | It can be assigned later.
+                */
+
+                $data['driver_id'] =
+                    $data['driver_id'] ?? null;
             }
 
 
             /*
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             | Amount
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             */
 
             $baseAmount =
                 $data['base_amount']
                 ?? 0;
+
 
             if ((float) $baseAmount < 0) {
 
@@ -308,9 +345,9 @@ class TripService
 
 
             /*
-            |------------------------------------------------------------------
-            | Prepare Data
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
+            | Prepare data
+            |--------------------------------------------------------------------------
             */
 
             $data['rental_type'] =
@@ -339,9 +376,9 @@ class TripService
 
 
             /*
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             | Create
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             */
 
             return $this->repository->create(
@@ -362,16 +399,20 @@ class TripService
         array $data
     ): Trip {
 
-        return DB::transaction(function () use ($trip, $data) {
+        return DB::transaction(function () use (
+            $trip,
+            $data
+        ) {
 
             /*
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             | Vehicle Conflict
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             */
 
             if (
-                isset($data['vehicle_id']) &&
+                isset($data['vehicle_id'])
+                &&
                 (int) $data['vehicle_id'] !==
                 (int) $trip->vehicle_id
             ) {
@@ -382,6 +423,7 @@ class TripService
                         $trip->id
                     )
                 ) {
+
                     throw new ConflictException(
                         'Vehicle already has an active trip.'
                     );
@@ -390,14 +432,16 @@ class TripService
 
 
             /*
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             | Return Odometer
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             */
 
             if (
-                isset($data['return_odometer']) &&
-                $data['return_odometer'] !== null &&
+                isset($data['return_odometer'])
+                &&
+                $data['return_odometer'] !== null
+                &&
                 $data['return_odometer'] <
                 $trip->pickup_odometer
             ) {
@@ -409,9 +453,9 @@ class TripService
 
 
             /*
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             | Rental Type
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             */
 
             $rentalType =
@@ -420,9 +464,9 @@ class TripService
 
 
             /*
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             | Validate Rental Type
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             */
 
             if (!in_array(
@@ -441,21 +485,15 @@ class TripService
 
 
             /*
-            |==================================================================
+            |--------------------------------------------------------------------------
             | SELF DRIVE
-            |==================================================================
+            |--------------------------------------------------------------------------
             */
 
             if (
                 $rentalType ===
                 Trip::RENTAL_TYPE_SELF_DRIVE
             ) {
-
-                /*
-                |--------------------------------------------------------------
-                | Pickup branch
-                |--------------------------------------------------------------
-                */
 
                 $data['pickup_branch_id'] =
                     array_key_exists(
@@ -465,12 +503,6 @@ class TripService
                         ? $data['pickup_branch_id']
                         : $trip->pickup_branch_id;
 
-
-                /*
-                |--------------------------------------------------------------
-                | Drop branch
-                |--------------------------------------------------------------
-                */
 
                 $data['drop_branch_id'] =
                     array_key_exists(
@@ -482,9 +514,7 @@ class TripService
 
 
                 /*
-                |--------------------------------------------------------------
                 | Pickup branch required
-                |--------------------------------------------------------------
                 */
 
                 if (!$data['pickup_branch_id']) {
@@ -496,16 +526,27 @@ class TripService
 
 
                 /*
-                |--------------------------------------------------------------
-                | Locations must be NULL
-                |--------------------------------------------------------------
+                | Drop branch required
+                */
+
+                if (!$data['drop_branch_id']) {
+
+                    throw new ConflictException(
+                        'Drop branch is required for a self drive trip.'
+                    );
+                }
+
+
+                /*
+                | Location must not be supplied
                 */
 
                 if (
                     array_key_exists(
                         'pickup_location',
                         $data
-                    ) &&
+                    )
+                    &&
                     !empty($data['pickup_location'])
                 ) {
 
@@ -519,7 +560,8 @@ class TripService
                     array_key_exists(
                         'drop_location',
                         $data
-                    ) &&
+                    )
+                    &&
                     !empty($data['drop_location'])
                 ) {
 
@@ -529,6 +571,10 @@ class TripService
                 }
 
 
+                /*
+                | Force NULL
+                */
+
                 $data['pickup_location'] =
                     null;
 
@@ -537,9 +583,7 @@ class TripService
 
 
                 /*
-                |--------------------------------------------------------------
-                | Self drive does not use driver
-                |--------------------------------------------------------------
+                | Self drive = no driver
                 */
 
                 $data['driver_id'] =
@@ -548,51 +592,15 @@ class TripService
 
 
             /*
-            |==================================================================
+            |--------------------------------------------------------------------------
             | WITH DRIVER
-            |==================================================================
+            |--------------------------------------------------------------------------
             */
 
             if (
                 $rentalType ===
                 Trip::RENTAL_TYPE_WITH_DRIVER
             ) {
-
-                /*
-                |--------------------------------------------------------------
-                | Pickup branch
-                |--------------------------------------------------------------
-                */
-
-                $data['pickup_branch_id'] =
-                    array_key_exists(
-                        'pickup_branch_id',
-                        $data
-                    )
-                        ? $data['pickup_branch_id']
-                        : $trip->pickup_branch_id;
-
-
-                /*
-                |--------------------------------------------------------------
-                | Drop branch
-                |--------------------------------------------------------------
-                */
-
-                $data['drop_branch_id'] =
-                    array_key_exists(
-                        'drop_branch_id',
-                        $data
-                    )
-                        ? $data['drop_branch_id']
-                        : $trip->drop_branch_id;
-
-
-                /*
-                |--------------------------------------------------------------
-                | Pickup location
-                |--------------------------------------------------------------
-                */
 
                 $data['pickup_location'] =
                     array_key_exists(
@@ -602,12 +610,6 @@ class TripService
                         ? $data['pickup_location']
                         : $trip->pickup_location;
 
-
-                /*
-                |--------------------------------------------------------------
-                | Drop location
-                |--------------------------------------------------------------
-                */
 
                 $data['drop_location'] =
                     array_key_exists(
@@ -619,23 +621,7 @@ class TripService
 
 
                 /*
-                |--------------------------------------------------------------
-                | Pickup branch required
-                |--------------------------------------------------------------
-                */
-
-                if (!$data['pickup_branch_id']) {
-
-                    throw new ConflictException(
-                        'Pickup branch is required for a driver trip.'
-                    );
-                }
-
-
-                /*
-                |--------------------------------------------------------------
                 | Pickup location required
-                |--------------------------------------------------------------
                 */
 
                 if (empty($data['pickup_location'])) {
@@ -647,9 +633,7 @@ class TripService
 
 
                 /*
-                |--------------------------------------------------------------
                 | Drop location required
-                |--------------------------------------------------------------
                 */
 
                 if (empty($data['drop_location'])) {
@@ -658,13 +642,58 @@ class TripService
                         'Drop location is required for a driver trip.'
                     );
                 }
+
+
+                /*
+                | Branches must not be used
+                */
+
+                if (
+                    array_key_exists(
+                        'pickup_branch_id',
+                        $data
+                    )
+                    &&
+                    !empty($data['pickup_branch_id'])
+                ) {
+
+                    throw new ConflictException(
+                        'Pickup branch cannot be used for a driver trip.'
+                    );
+                }
+
+
+                if (
+                    array_key_exists(
+                        'drop_branch_id',
+                        $data
+                    )
+                    &&
+                    !empty($data['drop_branch_id'])
+                ) {
+
+                    throw new ConflictException(
+                        'Drop branch cannot be used for a driver trip.'
+                    );
+                }
+
+
+                /*
+                | Force branches to NULL
+                */
+
+                $data['pickup_branch_id'] =
+                    null;
+
+                $data['drop_branch_id'] =
+                    null;
             }
 
 
             /*
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             | Rental Type
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             */
 
             $data['rental_type'] =
@@ -672,9 +701,9 @@ class TripService
 
 
             /*
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             | Update
-            |------------------------------------------------------------------
+            |--------------------------------------------------------------------------
             */
 
             return $this->repository->update(
@@ -785,9 +814,7 @@ class TripService
 
 
                 /*
-                |--------------------------------------------------------------
                 | Return Odometer
-                |--------------------------------------------------------------
                 */
 
                 $returnOdometer =
@@ -806,9 +833,7 @@ class TripService
 
 
                 /*
-                |--------------------------------------------------------------
                 | Charges
-                |--------------------------------------------------------------
                 */
 
                 $extraKmCharge =
@@ -829,9 +854,7 @@ class TripService
 
 
                 /*
-                |--------------------------------------------------------------
-                | Validate Charges
-                |--------------------------------------------------------------
+                | Validate charges
                 */
 
                 if (
@@ -848,23 +871,23 @@ class TripService
 
 
                 /*
-                |--------------------------------------------------------------
                 | Total
-                |--------------------------------------------------------------
                 */
 
                 $total =
                     (float) $trip->base_amount
-                    + (float) $extraKmCharge
-                    + (float) $lateCharge
-                    + (float) $damageCharge
-                    + (float) $fuelCharge;
+                    +
+                    (float) $extraKmCharge
+                    +
+                    (float) $lateCharge
+                    +
+                    (float) $damageCharge
+                    +
+                    (float) $fuelCharge;
 
 
                 /*
-                |--------------------------------------------------------------
                 | Complete
-                |--------------------------------------------------------------
                 */
 
                 return $this->repository->update(
