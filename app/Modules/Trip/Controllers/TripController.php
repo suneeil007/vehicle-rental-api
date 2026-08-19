@@ -10,6 +10,7 @@ use App\Helpers\ApiResponse;
 
 use App\Modules\Trip\Models\Trip;
 use App\Modules\Trip\Services\TripService;
+use App\Modules\Trip\Resources\TripResource;
 
 use App\Modules\Trip\Requests\StoreTripRequest;
 use App\Modules\Trip\Requests\UpdateTripRequest;
@@ -17,8 +18,6 @@ use App\Modules\Trip\Requests\CompleteTripRequest;
 
 use App\Modules\Invoice\Services\InvoiceService;
 use App\Modules\Invoice\Resources\InvoiceResource;
-
-use App\Modules\Trip\Resources\TripResource;
 
 class TripController extends Controller
 {
@@ -61,8 +60,10 @@ class TripController extends Controller
     /**
      * Show trip.
      */
-    public function show(Trip $trip)
-    {
+    public function show(
+        Trip $trip
+    ): JsonResponse {
+
         $trip->load([
             'customer',
             'vehicle',
@@ -72,13 +73,14 @@ class TripController extends Controller
             'pickupStaff',
             'returnStaff',
             'cancelledBy',
+            'booking',
+            'payments',
         ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Trip retrieved successfully.',
-            'data' => new TripResource($trip),
-        ]);
+        return ApiResponse::success(
+            new TripResource($trip),
+            'Trip retrieved successfully.'
+        );
     }
 
     /**
@@ -102,6 +104,7 @@ class TripController extends Controller
 
     /**
      * Pickup trip.
+     *
      * Assign staff and hand over vehicle.
      */
     public function pickup(
@@ -122,13 +125,16 @@ class TripController extends Controller
 
     /**
      * Start trip.
+     *
      * Vehicle is now on road.
      */
     public function start(
         Trip $trip
     ): JsonResponse {
 
-        $trip = $this->tripService->start($trip);
+        $trip = $this->tripService->start(
+            $trip
+        );
 
         return ApiResponse::success(
             new TripResource($trip),
@@ -138,6 +144,7 @@ class TripController extends Controller
 
     /**
      * Complete trip.
+     *
      * Vehicle returned and final bill calculated.
      */
     public function complete(
@@ -166,12 +173,16 @@ class TripController extends Controller
     ): JsonResponse {
 
         $request->validate([
-            'reason' => ['required', 'string', 'max:1000'],
+            'reason' => [
+                'required',
+                'string',
+                'max:1000',
+            ],
         ]);
 
         $trip = $this->tripService->cancel(
             $trip,
-            $request->reason,
+            $request->input('reason'),
             $request->user()->id
         );
 
@@ -181,15 +192,23 @@ class TripController extends Controller
         );
     }
 
-    public function myTrips(Request $request)
-    {
+    /**
+     * Get trips belonging to authenticated customer.
+     */
+    public function myTrips(
+        Request $request
+    ): JsonResponse {
+
         $trips = $request->user()
             ->customerTrips()
             ->with([
+                'customer',
                 'vehicle',
                 'driver',
                 'pickupBranch',
-                'dropBranch'
+                'dropBranch',
+                'booking',
+                'payments',
             ])
             ->latest()
             ->paginate(10);
@@ -204,7 +223,7 @@ class TripController extends Controller
      * Generate invoice from completed trip.
      */
     public function generateInvoice(
-        \App\Modules\Trip\Models\Trip $trip,
+        Trip $trip,
         InvoiceService $invoiceService
     ): JsonResponse {
 

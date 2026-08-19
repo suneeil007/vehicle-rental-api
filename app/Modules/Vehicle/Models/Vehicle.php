@@ -3,7 +3,7 @@
 namespace App\Modules\Vehicle\Models;
 
 use App\Modules\Booking\Models\Booking;
-
+use App\Modules\Branch\Models\Branch;
 use App\Modules\Vehicle\Enums\FuelType;
 use App\Modules\Vehicle\Enums\TransmissionType;
 use App\Modules\Vehicle\Enums\VehicleStatus;
@@ -20,6 +20,7 @@ class Vehicle extends Model
 
     protected $fillable = [
         'vehicle_category_id',
+        'branch_id',
         'name',
         'slug',
         'brand',
@@ -69,4 +70,14 @@ class Vehicle extends Model
             'id'
         );
     }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(
+            Branch::class,
+            'branch_id',
+            'id'
+        );
+    }
+    
 }

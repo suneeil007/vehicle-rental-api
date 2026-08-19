@@ -14,25 +14,159 @@ class StoreBookingRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'customer_id' => 'required|exists:users,id',
 
-            'vehicle_id' => 'required|exists:vehicles,id',
+            /*
+            |--------------------------------------------------------------------------
+            | Customer
+            |--------------------------------------------------------------------------
+            */
 
-            'rental_type' => 'required|in:self_drive,with_driver',
+            'customer_id' => [
+                'required',
+                'exists:users,id',
+            ],
 
-            'pickup_branch_id' => 'required|exists:branches,id',
+            /*
+            |--------------------------------------------------------------------------
+            | Vehicle
+            |--------------------------------------------------------------------------
+            */
 
-            'drop_branch_id' => 'nullable|exists:branches,id',
+            'vehicle_id' => [
+                'required',
+                'exists:vehicles,id',
+            ],
 
-            'pickup_at' => 'required|date|after:now',
+            /*
+            |--------------------------------------------------------------------------
+            | Rental Type
+            |--------------------------------------------------------------------------
+            */
 
-            'expected_return_at' => 'required|date|after:pickup_at',
+            'rental_type' => [
+                'required',
+                'in:self_drive,with_driver',
+            ],
 
-            'quoted_amount' => 'required|numeric|min:0',
+            /*
+            |--------------------------------------------------------------------------
+            | Pickup Branch
+            |--------------------------------------------------------------------------
+            |
+            | Self Drive:
+            |     Customer comes to the selected branch.
+            |     Therefore branch is REQUIRED.
+            |
+            | With Driver:
+            |     Driver goes to customer's pickup location.
+            |     Therefore branch is NULL.
+            |
+            */
 
-            'discount_amount' => 'nullable|numeric|min:0',
+            'pickup_branch_id' => [
+                'nullable',
+                'exists:branches,id',
+                'required_if:rental_type,self_drive',
+            ],
 
-            'customer_notes' => 'nullable|string',
+            /*
+            |--------------------------------------------------------------------------
+            | Drop Branch
+            |--------------------------------------------------------------------------
+            */
+
+            'drop_branch_id' => [
+                'nullable',
+                'exists:branches,id',
+            ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Pickup Location
+            |--------------------------------------------------------------------------
+            |
+            | With Driver:
+            |     Customer gives pickup location.
+            |
+            | Self Drive:
+            |     Customer comes to branch.
+            |     Therefore location is not required.
+            |
+            */
+
+            'pickup_location' => [
+                'nullable',
+                'string',
+                'max:500',
+                'required_if:rental_type,with_driver',
+            ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Drop Location
+            |--------------------------------------------------------------------------
+            |
+            | Optional.
+            |
+            */
+
+            'drop_location' => [
+                'nullable',
+                'string',
+                'max:500',
+            ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Dates
+            |--------------------------------------------------------------------------
+            */
+
+            'pickup_at' => [
+                'required',
+                'date',
+                'after:now',
+            ],
+
+            'expected_return_at' => [
+                'required',
+                'date',
+                'after:pickup_at',
+            ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Amounts
+            |--------------------------------------------------------------------------
+            */
+
+            'quoted_amount' => [
+                'required',
+                'numeric',
+                'min:0',
+            ],
+
+            'discount_amount' => [
+                'nullable',
+                'numeric',
+                'min:0',
+            ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Notes
+            |--------------------------------------------------------------------------
+            */
+
+            'customer_notes' => [
+                'nullable',
+                'string',
+            ],
+
+            'admin_notes' => [
+                'nullable',
+                'string',
+            ],
         ];
     }
 }

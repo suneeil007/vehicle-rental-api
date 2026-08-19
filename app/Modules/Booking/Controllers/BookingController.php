@@ -12,6 +12,7 @@ use App\Modules\Booking\Models\Booking;
 use App\Modules\Booking\Services\BookingService;
 
 use App\Modules\Booking\Requests\StoreBookingRequest;
+use App\Modules\Booking\Requests\UpdateBookingRequest;
 use App\Modules\Booking\Resources\BookingResource;
 
 class BookingController extends Controller
@@ -58,6 +59,15 @@ class BookingController extends Controller
     public function show(
         Booking $booking
     ): JsonResponse {
+
+        $booking->load([
+            'customer',
+            'vehicle',
+            'pickupBranch',
+            'dropBranch',
+            'approvedBy',
+            'trip',
+        ]);
 
         return ApiResponse::success(
             new BookingResource($booking),
@@ -128,4 +138,53 @@ class BookingController extends Controller
             'Trip created from booking successfully.'
         );
     }
+
+    public function restore(
+        Booking $booking
+    ): JsonResponse {
+
+        $booking = $this->service->restore($booking);
+
+        return ApiResponse::updated(
+            new BookingResource($booking),
+            'Booking restored successfully.'
+        );
+    }
+
+
+    /**
+     * Update booking.
+     */
+    public function update(
+        UpdateBookingRequest $request,
+        Booking $booking
+    ): JsonResponse {
+
+        $booking = $this->service->update(
+            $booking,
+            $request->validated()
+        );
+
+        return ApiResponse::updated(
+            new BookingResource($booking),
+            'Booking updated successfully.'
+        );
+    }
+
+    /**
+     * Delete booking.
+     */
+    public function destroy(
+        Booking $booking
+    ): JsonResponse {
+
+        $this->service->delete($booking);
+
+        return ApiResponse::success(
+            null,
+            'Booking deleted successfully.'
+        );
+    }
+
+
 }

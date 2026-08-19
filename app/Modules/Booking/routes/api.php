@@ -45,6 +45,23 @@ Route::prefix('bookings')
                     'createTrip'
                 );
 
+                Route::post(
+                    '/{booking}/restore',
+                    'restore'
+                );
+
+                Route::put('/{booking}', 'update');
+
+
+            });
+
+
+            Route::middleware(
+                'role:super-admin'
+            )
+            ->group(function(){
+
+                Route::delete('/{booking}', 'destroy');
 
             });
 
